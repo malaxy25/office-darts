@@ -41,6 +41,7 @@
     $$('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     const id = view === 'play' ? (game ? 'view-play' : 'view-setup') : 'view-' + view;
     $$('main.view').forEach(m => { m.hidden = m.id !== id; });
+    $('.footer').hidden = id === 'view-play';
     if (id === 'view-setup') renderSetup();
     if (id === 'view-play') renderPlay();
     if (view === 'ranking') renderRanking();
@@ -56,15 +57,24 @@
     const players = activePlayers();
     picked = picked.filter(id => players.some(p => p.id === id));
     $('#setup-empty').hidden = players.length > 0;
+    // Wer als Erstes gewählt ist, sieht bei allen anderen, wie viele Vernetzungspunkte ein Spiel bringt.
     const counts = Darts.pairCounts(db.games);
+    const me = picked[0];
+    const bonus = id => Darts.meetPoints(counts[Darts.pairKey(me, id)] ?? 0);
+    const best = Math.max(0, ...players.filter(p => !picked.includes(p.id)).map(p => bonus(p.id)));
     $('#setup-players').innerHTML = players.map(p => {
       const i = picked.indexOf(p.id);
-      const fresh = picked.length > 0 && i < 0 &&
-        picked.every(q => !counts[Darts.pairKey(p.id, q)]);
+      let badge = '';
+      if (me && i < 0) {
+        const b = bonus(p.id);
+        badge = `<span class="badge ${b === best ? 'best' : ''}">${b === best ? '★ ' : ''}+${b}</span>`;
+      }
       return `<button data-id="${p.id}" class="${i >= 0 ? 'on' : ''}">` +
-        (i >= 0 ? `<span class="order">${i + 1}</span>` : '') + esc(p.name) +
-        (fresh ? '<span class="badge">neu</span>' : '') + '</button>';
+        (i >= 0 ? `<span class="order">${i + 1}</span>` : '') + esc(p.name) + badge + '</button>';
     }).join('');
+    $('#setup-hint').textContent = me
+      ? `+Punkte: was ein Spiel ${playerName(me)} in der Rangliste «Vernetzung» bringt. ★ = am meisten.`
+      : 'Spielende in Wurfreihenfolge antippen (2–4).';
     $('#setup-start').disabled = picked.length < 2;
   }
 

@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="banner">Spielzeit ist keine Arbeitszeit – bitte vorher ausstempeln bzw. als Pause erfassen.</div>
+  <div class="banner">Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.</div>
 
   <nav class="tabs">
     <button data-view="play" class="active">Spielen</button>
@@ -25,20 +25,20 @@
   <main id="view-setup" class="view">
     <section class="card">
       <h2>Neues Spiel</h2>
-      <p class="hint">Spielende in Wurfreihenfolge antippen (2–4).</p>
+      <p id="setup-hint" class="hint">Spielende in Wurfreihenfolge antippen (2–4).</p>
       <div id="setup-players" class="chips"></div>
       <p id="setup-empty" class="hint" hidden>Noch niemand erfasst – unter «Spielende» Namen hinzufügen.</p>
       <div class="row">
         <label>Spiel
           <select id="setup-mode">
             <option value="501">501</option>
-            <option value="301">301</option>
+            <option value="301" selected>301</option>
           </select>
         </label>
         <label>Finish
           <select id="setup-out">
             <option value="double">Double-Out</option>
-            <option value="single">Single-Out (Einsteigende)</option>
+            <option value="single" selected>Single-Out (Einsteigende)</option>
           </select>
         </label>
       </div>
@@ -183,6 +183,8 @@
         Ideal zum Einsteigen.</p>
     </section>
   </main>
+
+  <footer class="footer">Office Darts v0.1.2 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
 
   <script src="scoring.js"></script>
   <script src="app.js"></script>
