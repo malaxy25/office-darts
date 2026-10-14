@@ -50,10 +50,16 @@ Vorschlag = Seltenheit × Aktivität × Spannung
 
 ## Technik
 
-- **Python** (FastAPI oder Flask) mit HTML-Seiten vom Server, wenig JavaScript.
-- **Datenbank:** PostgreSQL auf Render (die kostenlose Render-Festplatte ist flüchtig, SQLite ginge
-  bei jedem Neustart verloren).
-- **Hosting:** Render Web Service, eigene Subdomain.
+Alles soll **kostenlos** bleiben (Stand Oktober 2026):
+
+- **Infoseite (Phase 1):** Render **Static Site** – gratis, schläft nie, lädt sofort.
+- **App (Phase 2/3):** **Python** (FastAPI oder Flask) mit HTML-Seiten vom Server, wenig JavaScript,
+  als Render **Web Service** (gratis). Der schläft nach 15 Minuten ohne Besuch ein; der erste Aufruf
+  danach dauert etwa eine Minute. Falls das stört: während der Bürozeiten alle 10 Minuten anpingen
+  (750 Gratis-Stunden pro Monat reichen dafür).
+- **Datenbank:** **Neon** (Postgres, gratis: 0.5 GB pro Projekt, ohne Ablaufdatum, ohne Kreditkarte).
+  Nicht Render Postgres – die Gratis-Datenbank läuft dort nach 30 Tagen ab und wird gelöscht. Und keine
+  Datei-Datenbank (SQLite) auf Render: die Gratis-Instanz hat keine bleibende Festplatte.
 - **Tests** für die Wertungen (Elo, Vernetzungspunkte, Vorschläge) von Anfang an.
 
 ## Offene Fragen
