@@ -39,7 +39,6 @@
     banner: 'Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.',
     mode: '301',
     out: 'single',
-    period: 'all',   // Ranglisten: 'all', 'quarter' oder 'month'
   };
   const setting = k => db.settings && k in db.settings ? db.settings[k] : DEFAULTS[k];
 
@@ -483,28 +482,76 @@
 
   // ---- Rangliste ----
 
-  // Ansicht der Rangliste: 'period' (Quartal/Monat gemäss Einstellung) oder 'all'.
-  let season = 'period';
-  $$('[data-season]').forEach(b => b.addEventListener('click', () => {
-    season = b.dataset.season;
+  // Filter: rankKind 'all', 'year', 'quarter' oder 'month'; rankKey der gewählte Zeitraum.
+  // Wer den Tab öffnet, sieht immer zuerst «Gesamt».
+  let rankKind = 'all', rankKey = null;
+  $$('[data-kind]').forEach(b => b.addEventListener('click', () => {
+    rankKind = b.dataset.kind;
+    rankKey = null;
     renderRanking();
   }));
+  $('#rank-period').addEventListener('change', e => {
+    rankKey = Number(e.target.value);
+    renderRanking();
+  });
 
-  function periodStart(period) {
-    const d = new Date();
-    if (period === 'month') return new Date(d.getFullYear(), d.getMonth(), 1);
-    return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1);
+  // Zeiträume, in denen gespielt wurde, neueste zuerst.
+  function periodsWithGames(kind) {
+    const keys = [];
+    db.games.forEach(g => {
+      const k = Darts.periodOf(g.date, kind);
+      if (keys.indexOf(k) < 0) keys.push(k);
+    });
+    return keys.sort((a, b) => b - a);
+  }
+
+  // Beste in Elo und Vernetzung; bei Gleichstand alle.
+  function bestOf(games) {
+    const active = id => activePlayers().some(p => p.id === id);
+    const top = scores => {
+      const ids = Object.keys(scores).filter(active);
+      const max = Math.max.apply(null, ids.map(id => Math.round(scores[id])));
+      return { ids: ids.filter(id => Math.round(scores[id]) === max), value: max };
+    };
+    return { elo: top(Darts.eloRatings(games).rating), net: top(Darts.networkPoints(games).points) };
+  }
+
+  function renderHonors(sorted) {
+    const now = new Date();
+    const rows = [];
+    ['year', 'quarter', 'month'].forEach((kind, order) => {
+      periodsWithGames(kind).forEach(key => {
+        const end = Darts.periodEnd(kind, key);
+        if (end > now) return;   // nur abgeschlossene Zeiträume
+        const games = sorted.filter(g => Darts.periodOf(g.date, kind) === key);
+        rows.push({ kind, key, end, order, best: bestOf(games) });
+      });
+    });
+    // Neueste zuerst; endet ein Jahr, Quartal und Monat am selben Tag, kommt das Jahr zuerst.
+    rows.sort((a, b) => b.end - a.end || a.order - b.order);
+    const names = t => t.ids.length ? t.ids.map(id => esc(playerName(id))).join(', ') + ` <span class="hint">(${t.value})</span>` : '–';
+    $('#table-honors').innerHTML = rows.length
+      ? '<tr><th>Zeitraum</th><th>Können</th><th>Vernetzung</th></tr>' +
+        rows.map(r => `<tr class="${r.kind}"><td>${Darts.periodLabel(r.kind, r.key)}</td>` +
+          `<td>${names(r.best.elo)}</td><td>${names(r.best.net)}</td></tr>`).join('')
+      : '<tr><td class="hint">Die ersten Einträge kommen, sobald ein Monat mit Spielen vorbei ist.</td></tr>';
   }
 
   function renderRanking() {
-    const period = setting('period');
-    $('#season-row').hidden = period === 'all';
-    $('[data-season="period"]').textContent = period === 'month' ? 'Dieser Monat' : 'Dieses Quartal';
-    $$('[data-season]').forEach(x => x.classList.toggle('active', x.dataset.season === season));
+    $$('[data-kind]').forEach(x => x.classList.toggle('active', x.dataset.kind === rankKind));
+    const sel = $('#rank-period');
+    sel.hidden = rankKind === 'all';
+    if (rankKind !== 'all') {
+      const keys = periodsWithGames(rankKind);
+      if (!keys.length) keys.push(Darts.periodOf(new Date(), rankKind));
+      if (rankKey === null || keys.indexOf(rankKey) < 0) rankKey = keys[0];
+      sel.innerHTML = keys.map(k => `<option value="${k}">${Darts.periodLabel(rankKind, k)}</option>`).join('');
+      sel.value = String(rankKey);
+    }
     const sorted = db.games.slice().sort((a, b) => a.date.localeCompare(b.date));
-    const from = period !== 'all' && season === 'period' ? periodStart(period).toISOString() : '';
-    const games = sorted.filter(g => g.date >= from);
+    const games = rankKind === 'all' ? sorted : sorted.filter(g => Darts.periodOf(g.date, rankKind) === rankKey);
     const players = activePlayers();
+    renderHonors(sorted);
 
     const elo = Darts.eloRatings(games);
     const eloRows = players.filter(p => elo.played[p.id])
@@ -625,7 +672,6 @@
   function renderSettings() {
     $('#set-mode').value = setting('mode');
     $('#set-out').value = setting('out');
-    $('#set-period').value = setting('period');
     $('#set-name').value = setting('name');
     $('#set-banner').value = setting('banner');
     const last = load(KEY_BACKUP, null);
@@ -634,14 +680,13 @@
       : 'Noch nie gesichert.';
   }
 
-  [['#set-mode', 'mode'], ['#set-out', 'out'], ['#set-period', 'period'], ['#set-name', 'name'], ['#set-banner', 'banner']]
+  [['#set-mode', 'mode'], ['#set-out', 'out'], ['#set-name', 'name'], ['#set-banner', 'banner']]
     .forEach(([sel, key]) => $(sel).addEventListener('change', e => {
       if (!db.settings) db.settings = {};
       const v = e.target.value.trim();
       // Leerer Name heisst Standard; leeres Banner heisst kein Banner.
       db.settings[key] = key === 'name' && !v ? DEFAULTS.name : v;
       saveDb();
-      season = 'period';
       applySettings();
       renderSettings();
     }));

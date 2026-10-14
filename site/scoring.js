@@ -189,10 +189,30 @@
     return before === 0 ? 10 : Math.max(1, Math.floor(10 / (1 + before)));
   }
 
-  // Kalendermonat (Ortszeit) als Zahl, z. B. für «Oktober 2026».
-  function monthOf(date) {
+  // Zeitraum eines Datums als Zahl (Ortszeit): 'year' → 2026, 'quarter' → Jahr * 4 + 0…3,
+  // 'month' → Jahr * 12 + 0…11. Grössere Zahl = späterer Zeitraum.
+  function periodOf(date, kind) {
     const d = new Date(date);
-    return d.getFullYear() * 12 + d.getMonth();
+    const y = d.getFullYear(), m = d.getMonth();
+    if (kind === 'year') return y;
+    if (kind === 'quarter') return y * 4 + Math.floor(m / 3);
+    return y * 12 + m;
+  }
+  const monthOf = date => periodOf(date, 'month');
+
+  const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September',
+    'Oktober', 'November', 'Dezember'];
+  function periodLabel(kind, key) {
+    if (kind === 'year') return String(key);
+    if (kind === 'quarter') return 'Q' + (key % 4 + 1) + ' ' + Math.floor(key / 4);
+    return MONTHS[key % 12] + ' ' + Math.floor(key / 12);
+  }
+
+  // Erster Tag nach dem Zeitraum – zum Sortieren (Ende) und um abgeschlossene Zeiträume zu erkennen.
+  function periodEnd(kind, key) {
+    if (kind === 'year') return new Date(key + 1, 0, 1);
+    if (kind === 'quarter') return new Date(Math.floor(key / 4), (key % 4) * 3 + 3, 1);
+    return new Date(Math.floor(key / 12), key % 12 + 1, 1);
   }
 
   // Wie oft jedes Paar in den games gespielt hat.
@@ -233,6 +253,7 @@
     SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
     CRICKET, applyCricket, CLOCK, applyClock,
     ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey, monthOf,
+    periodOf, periodLabel, periodEnd,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Darts = api;

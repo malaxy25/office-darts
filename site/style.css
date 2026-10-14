@@ -231,4 +231,8 @@ body.playing .brand { display: none; }
 .row label.grow { flex: 1; min-width: 240px; }
 .about { text-align: center; color: var(--muted); font-size: 13px; }
 .about a { color: var(--muted); }
+.rank-filter { align-items: center; }
+.rank-filter select { min-width: 180px; }
+#table-honors tr.year td, #table-honors tr.quarter td:first-child { font-weight: 700; }
+#table-honors tr.year td { color: var(--warn); }
 #win-back { margin-top: 8px; font-size: 15px; }

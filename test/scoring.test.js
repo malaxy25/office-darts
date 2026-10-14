@@ -118,3 +118,16 @@ assert.strictEqual(D.applyClock(19, [h(20, 1), h(25, 1)]).win, true);
 assert.strictEqual(D.applyClock(20, [h(25, 2), h(20, 1)]).used, 1);
 
 console.log('Cricket- und Around-the-Clock-Tests bestanden.');
+
+// Zeiträume
+const oct = new Date(2026, 9, 14, 12);
+assert.strictEqual(D.periodOf(oct, 'year'), 2026);
+assert.strictEqual(D.periodLabel('quarter', D.periodOf(oct, 'quarter')), 'Q4 2026');
+assert.strictEqual(D.periodLabel('month', D.periodOf(oct, 'month')), 'Oktober 2026');
+assert.strictEqual(D.periodLabel('month', D.periodOf(new Date(2026, 0, 1), 'month')), 'Januar 2026');
+assert.strictEqual(D.periodEnd('quarter', D.periodOf(oct, 'quarter')).getTime(), new Date(2027, 0, 1).getTime());
+assert.strictEqual(D.periodEnd('month', D.periodOf(new Date(2026, 11, 5), 'month')).getTime(), new Date(2027, 0, 1).getTime());
+assert.strictEqual(D.periodEnd('year', 2026).getTime(), new Date(2027, 0, 1).getTime());
+assert.ok(D.periodOf(new Date(2026, 11, 31), 'month') < D.periodOf(new Date(2027, 0, 1), 'month'));
+
+console.log('Zeitraum-Tests bestanden.');

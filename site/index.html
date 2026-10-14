@@ -9,7 +9,7 @@
   <title>Office Darts</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=0.1.8">
 </head>
 <body>
   <div id="banner" class="banner">Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.</div>
@@ -92,16 +92,19 @@
 
   <!-- Rangliste -->
   <main id="view-ranking" class="view" hidden>
-    <div id="season-row" class="row">
+    <div class="row rank-filter">
       <div class="segmented">
-        <button data-season="period" class="active">Dieses Quartal</button>
-        <button data-season="all">Gesamt</button>
+        <button data-kind="all" class="active">Gesamt</button>
+        <button data-kind="year">Jahr</button>
+        <button data-kind="quarter">Quartal</button>
+        <button data-kind="month">Monat</button>
       </div>
+      <select id="rank-period" hidden aria-label="Zeitraum"></select>
     </div>
     <div class="grid2">
       <section class="card">
         <h2>Können <small>Elo</small></h2>
-        <p class="hint">Alle starten bei 1000. Wer gegen Stärkere gewinnt, steigt mehr. 100 Punkte Unterschied:
+        <p class="hint">Alle starten bei 1000 – auch in jedem Zeitraum neu. Wer gegen Stärkere gewinnt, steigt mehr. 100 Punkte Unterschied:
           die stärkere Person gewinnt etwa 2 von 3 Spielen, bei 200 Punkten etwa 3 von 4.</p>
         <table id="table-elo"></table>
       </section>
@@ -112,6 +115,11 @@
         <table id="table-net"></table>
       </section>
     </div>
+    <section class="card">
+      <h2>Ehrentafel</h2>
+      <p class="hint">Die Besten jedes abgeschlossenen Monats, Quartals und Jahres.</p>
+      <table id="table-honors"></table>
+    </section>
     <section class="card">
       <h2>Mit wem noch nie?</h2>
       <p class="hint">Paare, die noch nie gegeneinander gespielt haben.</p>
@@ -144,7 +152,7 @@
       </div>
     </section>
     <section class="card">
-      <h2>Spiel und Rangliste</h2>
+      <h2>Neues Spiel</h2>
       <div class="row">
         <label>Vorgewähltes Spiel
           <select id="set-mode">
@@ -160,15 +168,7 @@
             <option value="single">Single-Out (Einsteigende)</option>
           </select>
         </label>
-        <label>Ranglisten zählen
-          <select id="set-period">
-            <option value="all">über die ganze Zeit</option>
-            <option value="quarter">pro Quartal (neu ab 1. Jan., Apr., Jul., Okt.)</option>
-            <option value="month">pro Monat</option>
-          </select>
-        </label>
       </div>
-      <p class="hint">Bei «pro Quartal» oder «pro Monat» lässt sich in der Rangliste trotzdem «Gesamt» ansehen.</p>
     </section>
     <section class="card">
       <h2>Anzeige</h2>
@@ -189,7 +189,7 @@
         <button id="btn-clear-all">Alles löschen</button>
       </div>
     </section>
-    <p class="about">Office Darts v0.1.7 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></p>
+    <p class="about">Office Darts v0.1.8 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></p>
   </main>
 
   <!-- Regeln -->
@@ -218,34 +218,75 @@
       <p>Ausbullen: Alle werfen einen Pfeil aufs Bull, wer am nächsten ist, beginnt. Bei der Revanche beginnt die andere Person.</p>
     </section>
     <section class="card">
+      <h2>Die Scheibe</h2>
+      <ul>
+        <li>Jede Zahl hat vier Flächen: zwei grosse (<b>Single</b>, zählt einfach), den äusseren schmalen Ring
+          (<b>Double</b>, zählt doppelt) und den inneren schmalen Ring (<b>Triple</b>, zählt dreifach).</li>
+        <li>In der Mitte: der grüne Ring (<b>25</b>) und der rote Punkt (<b>Bull</b> = 50, gilt als Double).</li>
+        <li>Pro Aufnahme wirft man drei Pfeile, dann ist die nächste Person dran.</li>
+      </ul>
+    </section>
+    <section class="card">
       <h2>501 / 301</h2>
-      <p>Alle starten bei 501 (oder 301). Pro Aufnahme drei Pfeile, die Punkte werden abgezogen.
+      <p>Alle starten bei 501 (oder 301). Die Punkte jeder Aufnahme werden abgezogen.
         Wer genau auf 0 kommt, gewinnt.</p>
-      <p><b>Double-Out:</b> Der letzte Pfeil muss ein Double treffen (äusserer schmaler Ring) oder das Bull.
-        Bei <b>Single-Out</b> genügt jedes Feld.</p>
-      <p><b>Überworfen</b> (unter 0, genau 0 ohne Double, oder bei Double-Out Rest 1): Die ganze Aufnahme
-        zählt nicht, der Rest bleibt wie vorher.</p>
-      <p class="hint">Beispiel: Rest 40 – ein Pfeil auf D20 beendet das Spiel. Rest 41 – zuerst 1, dann D20.</p>
+      <ul>
+        <li><b>Single-Out</b> (für Einsteigende): Der letzte Pfeil darf jedes Feld sein.</li>
+        <li><b>Double-Out:</b> Der letzte Pfeil muss ein Double oder das Bull sein.</li>
+        <li><b>Überworfen:</b> Unter 0, genau 0 ohne Double oder bei Double-Out Rest 1 – dann zählt die ganze
+          Aufnahme nicht, der Rest bleibt wie vorher.</li>
+      </ul>
+      <p class="hint">Beispiel Double-Out: Rest 40 – ein Pfeil auf D20 beendet das Spiel. Rest 41 – zuerst 1,
+        dann D20. Das Tablet zeigt einen Finish-Vorschlag.</p>
     </section>
     <section class="card">
       <h2>Cricket</h2>
-      <p>Es zählen nur 15–20 und Bull. Ein Feld ist geschlossen nach drei Treffern (Double zählt zwei,
-        Triple drei; das äussere Bull zählt einen, das innere zwei). Wer ein Feld geschlossen hat, sammelt dort
-        Punkte, bis auch das Gegenüber es schliesst – zu dritt oder zu viert, solange noch jemand anderes es
-        offen hat. Wer alle Felder geschlossen hat und gleich viele oder mehr Punkte hat, gewinnt.</p>
-      <p class="hint">Auf dem Tablet: / = ein Treffer, ✕ = zwei, eingekreist = geschlossen. Felder, die nichts
+      <p>Es zählen nur die Zahlen <b>15, 16, 17, 18, 19, 20</b> und das <b>Bull</b>. Alles andere ist ein Fehlwurf.</p>
+      <p><b>Felder schliessen:</b> Jede dieser Zahlen muss man <b>dreimal</b> treffen. Welcher Ring ist egal –
+        man zählt Treffer:</p>
+      <ul>
+        <li>Single = 1 Treffer, Double = 2 Treffer, Triple = 3 Treffer (Feld mit einem Pfeil zu).</li>
+        <li>Bull: grüner Ring (25) = 1 Treffer, roter Punkt = 2 Treffer.</li>
+        <li>Beispiele für die 20: «20, 20, 20» oder «D20 + 20» oder «T20» – jedes Mal ist die 20 zu.</li>
+      </ul>
+      <p><b>Punkte sammeln:</b> Trifft man eine Zahl, die man selbst schon geschlossen hat und das Gegenüber
+        noch nicht, gibt es Punkte in Höhe des Feldes. Hat das Gegenüber sie auch geschlossen, bringt sie
+        nichts mehr. Zu dritt oder zu viert gibt es Punkte, solange noch irgendjemand anders die Zahl offen hat.</p>
+      <p class="hint">Beispiel: Die 20 ist bei dir zu, beim Gegenüber nicht. Du triffst D20 → 40 Punkte.
+        Oder: Die 20 ist noch offen, du triffst 20 + T20 → zu, und die 2 Treffer zu viel geben 40 Punkte.</p>
+      <p><b>Gewinnen:</b> Wer alle sieben Felder geschlossen hat und gleich viele oder mehr Punkte hat als alle
+        anderen, gewinnt. Mit weniger Punkten heisst es: weiter Punkte sammeln, bis man vorne ist – oder bis die
+        anderen aufholen.</p>
+      <p class="hint">Auf dem Tablet: / = 1 Treffer, ✕ = 2, eingekreistes ✕ = geschlossen. Felder, die nichts
         mehr bringen, sind auf der Scheibe abgedunkelt.</p>
     </section>
     <section class="card">
       <h2>Around the Clock</h2>
-      <p>Der Reihe nach 1, 2, 3 … bis 20 treffen, zum Schluss das Bull (aussen oder innen). Double und
-        Triple zählen wie ein einfacher Treffer. Wer zuerst durch ist, gewinnt. Ideal zum Einsteigen.</p>
+      <p>Die Zahlen <b>der Reihe nach</b> treffen: 1, 2, 3 … bis 20, zum Schluss das Bull (grüner Ring oder
+        roter Punkt). Erst wenn die aktuelle Zahl getroffen ist, geht es zur nächsten.</p>
+      <ul>
+        <li>Welcher Ring ist egal: Single, Double und Triple zählen gleich – ein Schritt weiter.</li>
+        <li>Mit einer Aufnahme kann man mehrere Schritte schaffen (z. B. 4, 5, 6).</li>
+        <li>Wer zuerst das Bull trifft, gewinnt. Ideal zum Einsteigen und Einwerfen.</li>
+      </ul>
       <p class="hint">Auf dem Tablet ist das nächste Ziel hell, alles andere abgedunkelt.</p>
+    </section>
+    <section class="card">
+      <h2>Ranglisten</h2>
+      <ul>
+        <li><b>Können (Elo):</b> Alle starten bei 1000. Ein Sieg gegen Stärkere bringt viel, gegen Schwächere
+          wenig. 100 Punkte Unterschied: die stärkere Person gewinnt etwa 2 von 3 Spielen.</li>
+        <li><b>Vernetzung:</b> Das erste Spiel im Monat gegen jemanden gibt 10 Punkte, das zweite 5, dann 3, 2 …
+          mindestens 1. Jeden Monat beginnt es wieder bei 10 – Abwechslung lohnt sich.</li>
+        <li><b>Zeitraum:</b> Standard ist «Gesamt». Mit «Jahr», «Quartal» oder «Monat» sieht man, wer in diesem
+          Zeitraum am besten war. Die Ehrentafel hält die Besten jedes abgeschlossenen Zeitraums fest.</li>
+        <li>Alle Spielarten zählen gleich.</li>
+      </ul>
     </section>
   </main>
 
 
-  <script src="scoring.js"></script>
-  <script src="app.js"></script>
+  <script src="scoring.js?v=0.1.8"></script>
+  <script src="app.js?v=0.1.8"></script>
 </body>
 </html>
