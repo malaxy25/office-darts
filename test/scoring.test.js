@@ -61,3 +61,20 @@ const elo3 = D.eloRatings([{ players: ['a', 'b', 'c'], winner: 'a' }]);
 assert.ok(Math.abs(elo3.rating.a + elo3.rating.b + elo3.rating.c - 3000) < 1e-9);
 
 console.log('Alle Tests bestanden.');
+
+// Korrektur: Markierung landet im korrigierten Feld
+const moved = (h, x, y) => { const p = D.positionFor(h, x, y); return D.hitAt(p.x, p.y).label; };
+const [x19, y19] = at(80, 11 * 18);                       // Single 19 (innen)
+assert.strictEqual(moved(h(19, 2), x19, y19), 'D19');
+assert.strictEqual(moved(h(19, 3), x19, y19), 'T19');
+assert.strictEqual(moved(h(19, 1), ...at(185, 11 * 18)), '19'); // D19 → Single
+assert.strictEqual(moved(h(20, 3), x19, y19), 'T20');      // falsches Segment → ins richtige
+assert.strictEqual(moved(h(25, 2), x19, y19), 'Bull');
+assert.strictEqual(moved(h(25, 1), x19, y19), '25');
+assert.strictEqual(moved(h(7, 2), undefined, undefined), 'D7'); // ohne alten Punkt
+assert.strictEqual(D.positionFor(D.MISS, x19, y19), null);
+// gleiche Richtung bleibt erhalten, wenn das Segment stimmt
+const p19 = D.positionFor(h(19, 3), ...at(80, 11 * 18 + 5));
+assert.ok(Math.abs((Math.atan2(p19.x, -p19.y) * 180 / Math.PI + 360) % 360 - (11 * 18 + 5)) < 1);
+
+console.log('Korrektur-Tests bestanden.');

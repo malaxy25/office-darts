@@ -38,7 +38,7 @@
   // ---- Ansichten ----
 
   function show(view) {
-    $$('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    $$('.tabs button[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     const id = view === 'play' ? (game ? 'view-play' : 'view-setup') : 'view-' + view;
     $$('main.view').forEach(m => { m.hidden = m.id !== id; });
     $('.footer').hidden = id === 'view-play';
@@ -49,7 +49,7 @@
     if (view === 'ranking') renderRanking();
     if (view === 'players') renderPlayers();
   }
-  $$('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
+  $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
 
   // ---- Neues Spiel ----
 
@@ -214,7 +214,8 @@
       const d = game.darts[editing];
       const mult = Number(m.dataset.mult);
       const fixed = mult === 0 ? { ...Darts.MISS } : Darts.hit(d.value || 20, d.value === 25 ? Math.min(mult, 2) : mult);
-      game.darts[editing] = { ...fixed, x: d.x, y: d.y };
+      // Markierung auf der Scheibe ins korrigierte Feld verschieben.
+      game.darts[editing] = { ...fixed, ...Darts.positionFor(fixed, d.x, d.y) };
       editing = -1;
       game.darts = game.darts.slice(0, Darts.applyTurn(game.rest[game.current], game.darts, game.doubleOut).used);
       saveGame();

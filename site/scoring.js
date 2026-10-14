@@ -36,6 +36,35 @@
     return hit(value, mult);
   }
 
+  // Wohin die Markierung gehört, wenn ein Pfeil auf `h` korrigiert wird. Liegt der alte Punkt
+  // schon im richtigen Segment, bleibt die Richtung und nur der Abstand zur Mitte ändert sich.
+  // Daneben: keine Markierung (null).
+  function positionFor(h, x, y) {
+    if (h.value === 0) return null;
+    if (h.value === 25 && h.mult === 2) return { x: 0, y: 0 };
+    const known = x !== undefined && y !== undefined && (x !== 0 || y !== 0);
+    const index = SEGMENTS.indexOf(h.value);
+    let angle = known ? (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360 : index * 18;
+    if (h.value !== 25 && hitAt(...polar(80, angle)).value !== h.value) angle = index * 18;
+    const r0 = known ? Math.hypot(x, y) : 0;
+    let r;
+    if (h.value === 25) r = (RINGS.bullIn + RINGS.bullOut) / 2;
+    else if (h.mult === 3) r = (RINGS.tripleIn + RINGS.tripleOut) / 2;
+    else if (h.mult === 2) r = (RINGS.doubleIn + RINGS.doubleOut) / 2;
+    else {
+      // Single: innen oder aussen – das Feld, das näher beim alten Punkt liegt.
+      const inner = (RINGS.bullOut + RINGS.tripleIn) / 2, outer = (RINGS.tripleOut + RINGS.doubleIn) / 2;
+      r = Math.abs(r0 - outer) < Math.abs(r0 - inner) ? outer : inner;
+    }
+    const [px, py] = polar(r, angle);
+    return { x: Math.round(px), y: Math.round(py) };
+  }
+
+  function polar(r, deg) {
+    const a = deg * Math.PI / 180;
+    return [r * Math.sin(a), -r * Math.cos(a)];
+  }
+
   // Wertet die Pfeile einer Aufnahme aus. Ergebnis: neuer Rest, ob überworfen (bust) oder
   // ausgecheckt, und wie viele Pfeile gezählt haben.
   function applyTurn(remaining, darts, doubleOut) {
@@ -143,7 +172,7 @@
   }
 
   const api = {
-    SEGMENTS, RINGS, MISS, hit, hitAt, applyTurn, checkoutHint,
+    SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
     ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
