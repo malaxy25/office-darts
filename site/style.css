@@ -133,6 +133,8 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
 #board .wire { fill: none; stroke: #9aa0a6; stroke-width: .8; pointer-events: none; }
 #board .mark circle { fill: #fff; stroke: #111; stroke-width: 2; }
 #board .mark text { fill: #111; font-size: 13px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+#board .seg, #board .num { transition: opacity .2s; }
+#board .dim { opacity: .3; }
 #board .flash { pointer-events: none; animation: flash .35s ease-out forwards; }
 @keyframes flash { from { opacity: .7; } to { opacity: 0; } }
 
@@ -147,6 +149,21 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
 .score .name { font-weight: 600; }
 .score .avg { color: var(--muted); font-size: 13px; margin-left: 8px; font-weight: 400; }
 .score .pts { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Cricket-Tafel */
+.cricket { font-size: 18px; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.cricket th, .cricket td { text-align: center; padding: 3px 4px; }
+.cricket th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+.cricket th.current { color: var(--text); font-weight: 700; }
+.cricket td.current { background: rgba(47, 179, 107, .12); }
+.cricket .total td { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cricket .field { color: var(--muted); font-weight: 700; }
+.cricket tr.done td { opacity: .35; }
+.cricket .closed {
+  display: inline-block; width: 26px; height: 26px; line-height: 22px;
+  border: 2px solid var(--accent); border-radius: 50%; color: var(--accent);
+}
+.cricket tr:last-child td { border-bottom: none; }
 
 .turn { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
 .turn-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 22px; font-weight: 700; }
@@ -188,6 +205,11 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
   .score .name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .score .avg { display: block; margin-left: 0; font-size: 12px; }
   .score .pts { font-size: 22px; }
+  .scores.has-table { display: block; }
+  .cricket { font-size: 15px; }
+  .cricket th, .cricket td { padding: 1px 4px; }
+  .cricket .total td { font-size: 17px; }
+  .cricket .closed { width: 20px; height: 20px; line-height: 16px; }
   /* Erfassung in zwei Zeilen: Pfeile + Rückgängig, Daneben + Bestätigen. Der Rest steht in der Spielerkarte. */
   .turn {
     padding: 8px 10px; display: grid; gap: 6px 8px; grid-template-columns: repeat(4, 1fr);

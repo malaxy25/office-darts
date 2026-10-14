@@ -23,6 +23,8 @@ von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja da
 
 - Scheibe antippen, wo die drei Pfeile stecken → «Bestätigen» → nächste Person.
 - 501/301, Double-Out oder Single-Out, Überworfen-Regel, Finish-Vorschlag, Korrigieren pro Pfeil.
+- Cricket (Tafel mit / ✕ und geschlossenen Feldern) und Around the Clock (Ziel auf der Scheibe hell).
+  Alle Spielarten zählen gemeinsam für die Ranglisten.
 - Ranglisten «Können» (Elo) und «Vernetzung» pro Quartal, «Mit wem noch nie?».
 - Daten bleiben im Browser des Tablets (localStorage). Sicherung als JSON herunterladen/laden.
 - Reine statische Seite → gratis als Render Static Site, schläft nie.

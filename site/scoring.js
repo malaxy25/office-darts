@@ -109,6 +109,46 @@
     return null;
   }
 
+  // ---- Cricket ----
+
+  const CRICKET = [20, 19, 18, 17, 16, 15, 25];
+
+  // marks: pro Person 7 Zahlen (Treffer auf 20 … 15, Bull, höchstens 3), points: pro Person.
+  // Wertet die Pfeile von Person p aus. Ergebnis: neue marks/points, ob gewonnen, wie viele Pfeile zählten.
+  function applyCricket(marks, points, p, darts) {
+    const m = marks.map(row => row.slice());
+    const pts = points.slice();
+    for (let i = 0; i < darts.length; i++) {
+      const d = darts[i];
+      const k = CRICKET.indexOf(d.value);
+      if (k >= 0) {
+        const close = Math.min(d.mult, 3 - m[p][k]);
+        m[p][k] += close;
+        const open = m.some((row, o) => o !== p && row[k] < 3);
+        if (open) pts[p] += (d.mult - close) * d.value;
+      }
+      const allClosed = m[p].every(n => n === 3);
+      if (allClosed && pts.every(x => pts[p] >= x)) {
+        return { marks: m, points: pts, win: true, used: i + 1 };
+      }
+    }
+    return { marks: m, points: pts, win: false, used: darts.length };
+  }
+
+  // ---- Around the Clock ----
+
+  const CLOCK = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25];
+
+  // pos: Index in CLOCK, also das nächste Ziel. Double und Triple zählen als ein Treffer.
+  function applyClock(pos, darts) {
+    let next = pos;
+    for (let i = 0; i < darts.length; i++) {
+      if (darts[i].value === CLOCK[next]) next++;
+      if (next === CLOCK.length) return { pos: next, win: true, used: i + 1 };
+    }
+    return { pos: next, win: false, used: darts.length };
+  }
+
   // ---- Ranglisten ----
 
   const ELO_START = 1000;
@@ -173,6 +213,7 @@
 
   const api = {
     SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
+    CRICKET, applyCricket, CLOCK, applyClock,
     ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

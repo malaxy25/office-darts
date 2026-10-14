@@ -89,25 +89,51 @@
     renderSetup();
   });
 
-  function startGame(players, start, doubleOut) {
+  // Spielarten: 'x01' (501/301), 'cricket', 'clock' (Around the Clock).
+  const MODE_NAMES = { cricket: 'Cricket', clock: 'Around the Clock' };
+  const isX01 = g => !g.mode || g.mode === 'x01';
+  const settingsOf = g => ({ mode: g.mode || 'x01', start: g.start, doubleOut: g.doubleOut });
+
+  function startGame(players, s) {
     game = {
       id: uid(),
-      start,
-      doubleOut,
+      mode: s.mode,
+      start: s.start,
+      doubleOut: s.doubleOut,
       players,
-      rest: players.map(() => start),
       thrown: players.map(() => 0),   // gezählte Pfeile
-      scored: players.map(() => 0),   // erzielte Punkte
       current: 0,
       darts: [],
       startedAt: new Date().toISOString(),
     };
+    if (s.mode === 'cricket') {
+      game.marks = players.map(() => Darts.CRICKET.map(() => 0));
+      game.points = players.map(() => 0);
+    } else if (s.mode === 'clock') {
+      game.pos = players.map(() => 0);  // Index des nächsten Ziels
+    } else {
+      game.rest = players.map(() => s.start);
+      game.scored = players.map(() => 0);  // erzielte Punkte
+    }
     saveGame();
     show('play');
   }
 
+  const setupMode = () => {
+    const v = $('#setup-mode').value;
+    return MODE_NAMES[v] ? v : 'x01';
+  };
+  $('#setup-mode').addEventListener('change', () => {
+    $('#setup-out-label').hidden = setupMode() !== 'x01';
+  });
+
   $('#setup-start').addEventListener('click', () => {
-    startGame(picked.slice(), Number($('#setup-mode').value), $('#setup-out').value === 'double');
+    const mode = setupMode();
+    startGame(picked.slice(), {
+      mode,
+      start: mode === 'x01' ? Number($('#setup-mode').value) : 0,
+      doubleOut: $('#setup-out').value === 'double',
+    });
   });
 
   // ---- Scheibe ----
@@ -140,15 +166,15 @@
       const dark = i % 2 === 0;
       const plain = dark ? c('--board-dark') : c('--board-light');
       const ring = dark ? c('--board-red') : c('--board-green');
-      el('path', { d: sector(R.bullOut, R.tripleIn, a1, a2), fill: plain, class: 'seg' }, board);
-      el('path', { d: sector(R.tripleIn, R.tripleOut, a1, a2), fill: ring, class: 'seg' }, board);
-      el('path', { d: sector(R.tripleOut, R.doubleIn, a1, a2), fill: plain, class: 'seg' }, board);
-      el('path', { d: sector(R.doubleIn, R.doubleOut, a1, a2), fill: ring, class: 'seg' }, board);
+      el('path', { d: sector(R.bullOut, R.tripleIn, a1, a2), fill: plain, class: 'seg', 'data-v': n }, board);
+      el('path', { d: sector(R.tripleIn, R.tripleOut, a1, a2), fill: ring, class: 'seg', 'data-v': n }, board);
+      el('path', { d: sector(R.tripleOut, R.doubleIn, a1, a2), fill: plain, class: 'seg', 'data-v': n }, board);
+      el('path', { d: sector(R.doubleIn, R.doubleOut, a1, a2), fill: ring, class: 'seg', 'data-v': n }, board);
       const [x, y] = pt((R.doubleOut + R.numbers) / 2, i * 18);
-      el('text', { x, y, class: 'num' }, board).textContent = n;
+      el('text', { x, y, class: 'num', 'data-v': n }, board).textContent = n;
     });
-    el('circle', { r: R.bullOut, fill: c('--board-green'), class: 'seg' }, board);
-    el('circle', { r: R.bullIn, fill: c('--board-red'), class: 'seg' }, board);
+    el('circle', { r: R.bullOut, fill: c('--board-green'), class: 'seg', 'data-v': 25 }, board);
+    el('circle', { r: R.bullIn, fill: c('--board-red'), class: 'seg', 'data-v': 25 }, board);
     for (const r of [R.bullIn, R.bullOut, R.tripleIn, R.tripleOut, R.doubleIn, R.doubleOut]) {
       el('circle', { r, class: 'wire' }, board);
     }
@@ -177,10 +203,18 @@
 
   // ---- Laufendes Spiel ----
 
-  const result = () => Darts.applyTurn(game.rest[game.current], game.darts, game.doubleOut);
+  // Wertet die Pfeile der laufenden Aufnahme aus. Immer dabei: used (gezählte Pfeile), win.
+  function result() {
+    const p = game.current;
+    if (game.mode === 'cricket') return Darts.applyCricket(game.marks, game.points, p, game.darts);
+    if (game.mode === 'clock') return Darts.applyClock(game.pos[p], game.darts);
+    const r = Darts.applyTurn(game.rest[p], game.darts, game.doubleOut);
+    r.win = r.checkout;
+    return r;
+  }
   const turnClosed = () => {
     const r = result();
-    return game.darts.length >= 3 || r.bust || r.checkout;
+    return game.darts.length >= 3 || r.bust || r.win;
   };
 
   function addDart(d) {
@@ -217,7 +251,7 @@
       // Markierung auf der Scheibe ins korrigierte Feld verschieben.
       game.darts[editing] = { ...fixed, ...Darts.positionFor(fixed, d.x, d.y) };
       editing = -1;
-      game.darts = game.darts.slice(0, Darts.applyTurn(game.rest[game.current], game.darts, game.doubleOut).used);
+      game.darts = game.darts.slice(0, result().used);
       saveGame();
       renderPlay();
     }
@@ -228,13 +262,18 @@
     const r = result();
     const p = game.current;
     game.thrown[p] += r.used;
-    if (!r.bust) {
+    if (game.mode === 'cricket') {
+      game.marks = r.marks;
+      game.points = r.points;
+    } else if (game.mode === 'clock') {
+      game.pos[p] = r.pos;
+    } else if (!r.bust) {
       game.scored[p] += game.rest[p] - r.remaining;
       game.rest[p] = r.remaining;
     }
     game.darts = [];
     editing = -1;
-    if (r.checkout) {
+    if (r.win) {
       finishGame(game.players[p]);
       return;
     }
@@ -259,27 +298,92 @@
   });
 
   const avg = i => game.thrown[i] ? (game.scored[i] / game.thrown[i] * 3).toFixed(1) : '–';
+  const target = pos => pos >= Darts.CLOCK.length ? '✓' : Darts.CLOCK[pos] === 25 ? 'Bull' : Darts.CLOCK[pos];
+  const sum = a => a.reduce((s, n) => s + n, 0);
+
+  function scoreCard(i, p, sub, pts) {
+    return `<div class="score ${i === p ? 'current' : ''}"><span class="name">${esc(playerName(game.players[i]))}` +
+      `<span class="avg">${sub}</span></span><span class="pts">${pts}</span></div>`;
+  }
+
+  // Cricket: Felder als Zeilen, Spielende als Spalten. / = 1 Treffer, ✕ = 2, eingekreist = geschlossen.
+  function cricketTable(p, r) {
+    const sym = n => n === 0 ? '' : n === 1 ? '/' : n === 2 ? '✕' : '<span class="closed">✕</span>';
+    const cls = i => i === p ? 'current' : '';
+    let html = '<table class="cricket"><tr><th></th>' +
+      game.players.map((id, i) => `<th class="${cls(i)}">${esc(playerName(id))}</th>`).join('') + '</tr>';
+    html += '<tr class="total"><td></td>' + r.points.map((n, i) => `<td class="${cls(i)}">${n}</td>`).join('') + '</tr>';
+    Darts.CRICKET.forEach((v, k) => {
+      const done = r.marks.every(row => row[k] === 3);
+      html += `<tr class="${done ? 'done' : ''}"><td class="field">${v === 25 ? 'Bull' : v}</td>` +
+        r.marks.map((row, i) => `<td class="${cls(i)}">${sym(row[k])}</td>`).join('') + '</tr>';
+    });
+    return html + '</table>';
+  }
+
+  function renderScores(p, r) {
+    let html;
+    if (game.mode === 'cricket') {
+      html = cricketTable(p, r);
+    } else if (game.mode === 'clock') {
+      html = game.players.map((id, i) => scoreCard(i, p, 'Ziel', target(i === p ? r.pos : game.pos[i]))).join('');
+    } else {
+      html = game.players.map((id, i) => scoreCard(i, p, `Ø ${avg(i)}`, i === p && !r.bust ? r.remaining : game.rest[i])).join('');
+    }
+    $('#scores').innerHTML = html;
+    $('#scores').classList.toggle('has-table', game.mode === 'cricket');
+  }
+
+  function turnText(p, r, closed) {
+    const n = game.darts.length;
+    if (game.mode === 'cricket') {
+      if (r.win) return 'Gewonnen! 🎯';
+      if (!n) return 'Es zählen 15–20 und Bull.';
+      const gained = r.points[p] - game.points[p];
+      return `Aufnahme: ${sum(r.marks[p]) - sum(game.marks[p])} Treffer` + (gained ? ` · +${gained} Punkte` : '');
+    }
+    if (game.mode === 'clock') {
+      if (r.win) return 'Durch! 🎯';
+      return `Ziel: ${target(r.pos)}` + (n ? ` · Aufnahme: ${r.pos - game.pos[p]} Treffer` : '');
+    }
+    if (r.bust) return 'Überworfen – die Aufnahme zählt nicht.';
+    if (r.checkout) return 'Ausgecheckt! 🎯';
+    const pts = game.darts.reduce((s, d) => s + d.points, 0);
+    const hint = Darts.checkoutHint(r.remaining, 3 - n, game.doubleOut);
+    return (n ? `Aufnahme: ${pts}` : '') +
+      (hint && !closed ? `${n ? ' · ' : ''}Finish: ${hint.map(h => h.label).join(' – ')}` : '');
+  }
+
+  // Felder, die gerade nichts bringen, abdunkeln: bei Around the Clock alles ausser dem Ziel,
+  // bei Cricket 1–14 und was alle geschlossen haben.
+  function highlightBoard(r) {
+    let active = null;
+    if (game.mode === 'clock') active = r.win ? [] : [Darts.CLOCK[r.pos]];
+    else if (game.mode === 'cricket') active = Darts.CRICKET.filter((v, k) => !r.marks.every(row => row[k] === 3));
+    $$('#board [data-v]').forEach(s => {
+      s.classList.toggle('dim', active !== null && active.indexOf(Number(s.getAttribute('data-v'))) < 0);
+    });
+  }
 
   function renderPlay() {
     if (!game) return;
     const p = game.current;
     const r = result();
-    const closed = game.darts.length >= 3 || r.bust || r.checkout;
+    const closed = game.darts.length >= 3 || r.bust || r.win;
 
-    $('#scores').innerHTML = game.players.map((id, i) =>
-      `<div class="score ${i === p ? 'current' : ''}"><span class="name">${esc(playerName(id))}` +
-      `<span class="avg">Ø ${avg(i)}</span></span><span class="pts">${i === p && !r.bust ? r.remaining : game.rest[i]}</span></div>`
-    ).join('');
+    renderScores(p, r);
 
     $('#turn-name').textContent = playerName(game.players[p]);
-    $('#turn-rest').textContent = r.bust ? game.rest[p] : r.remaining;
+    $('#turn-rest').textContent = game.mode === 'cricket' ? r.points[p]
+      : game.mode === 'clock' ? target(r.pos)
+      : r.bust ? game.rest[p] : r.remaining;
 
     let html = '';
     for (let i = 0; i < 3; i++) {
       const d = game.darts[i];
       if (d) {
         html += `<button class="dart ${r.bust && i === r.used - 1 ? 'void' : ''}" data-i="${i}">` +
-          `${esc(d.label)}<small>${d.points}</small></button>`;
+          esc(d.label) + (isX01(game) ? `<small>${d.points}</small>` : '') + '</button>';
       } else {
         html += `<div class="dart button empty">${i + 1}</div>`;
       }
@@ -296,23 +400,16 @@
 
     const info = $('#turn-info');
     info.className = 'turn-info';
-    if (r.bust) {
-      info.textContent = 'Überworfen – die Aufnahme zählt nicht.';
-      info.classList.add('bust');
-    } else if (r.checkout) {
-      info.textContent = 'Ausgecheckt! 🎯';
-      info.classList.add('win');
-    } else {
-      const sum = game.darts.reduce((s, d) => s + d.points, 0);
-      const hint = Darts.checkoutHint(r.remaining, 3 - game.darts.length, game.doubleOut);
-      info.textContent = (game.darts.length ? `Aufnahme: ${sum}` : '') +
-        (hint && !closed ? `${game.darts.length ? ' · ' : ''}Finish: ${hint.map(h => h.label).join(' – ')}` : '');
-    }
+    if (r.bust) info.classList.add('bust');
+    else if (r.win) info.classList.add('win');
+    info.textContent = turnText(p, r, closed);
 
     $('#btn-confirm').disabled = !closed;
-    $('#btn-confirm').textContent = r.checkout ? 'Sieg bestätigen' : 'Bestätigen – nächste Person';
+    $('#btn-confirm').textContent = r.win ? 'Sieg bestätigen' : 'Bestätigen – nächste Person';
     $('#btn-miss').disabled = closed;
     $('#btn-undo').disabled = game.darts.length === 0;
+
+    highlightBoard(r);
 
     const marks = $('#marks');
     marks.innerHTML = '';
@@ -326,26 +423,31 @@
 
   function finishGame(winner) {
     const g = game;
-    db.games.push({
+    const i = g.players.indexOf(winner);
+    const x01 = isX01(g);
+    const entry = {
       id: g.id,
       date: new Date().toISOString(),
-      mode: String(g.start) + (g.doubleOut ? '' : ' SO'),
+      mode: x01 ? String(g.start) + (g.doubleOut ? '' : ' SO') : MODE_NAMES[g.mode],
       players: g.players,
       winner,
       darts: g.thrown,
-      avg: g.players.map((_, i) => Number((g.thrown[i] ? g.scored[i] / g.thrown[i] * 3 : 0).toFixed(1))),
-    });
+    };
+    if (x01) entry.avg = g.players.map((_, j) => Number((g.thrown[j] ? g.scored[j] / g.thrown[j] * 3 : 0).toFixed(1)));
+    if (g.mode === 'cricket') entry.points = g.points;
+    db.games.push(entry);
     saveDb();
     game = null;
     saveGame();
-    const i = g.players.indexOf(winner);
     $('#win-title').textContent = `${playerName(winner)} gewinnt!`;
-    $('#win-text').textContent = `${g.thrown[i]} Pfeile · Ø ${(g.scored[i] / g.thrown[i] * 3).toFixed(1)} pro Aufnahme`;
+    $('#win-text').textContent = `${g.thrown[i]} Pfeile` +
+      (x01 ? ` · Ø ${(g.scored[i] / g.thrown[i] * 3).toFixed(1)} pro Aufnahme` : '') +
+      (g.mode === 'cricket' ? ` · ${g.points[i]} Punkte` : '');
     $('#win').hidden = false;
     $('#win-rematch').onclick = () => {
       $('#win').hidden = true;
       // Revanche: Reihenfolge rotiert, damit jemand anderes beginnt.
-      startGame(g.players.slice(1).concat(g.players[0]), g.start, g.doubleOut);
+      startGame(g.players.slice(1).concat(g.players[0]), settingsOf(g));
     };
     $('#win-new').onclick = () => {
       $('#win').hidden = true;

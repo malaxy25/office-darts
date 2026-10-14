@@ -78,3 +78,40 @@ const p19 = D.positionFor(h(19, 3), ...at(80, 11 * 18 + 5));
 assert.ok(Math.abs((Math.atan2(p19.x, -p19.y) * 180 / Math.PI + 360) % 360 - (11 * 18 + 5)) < 1);
 
 console.log('Korrektur-Tests bestanden.');
+
+// Cricket
+const zero = () => [0, 0, 0, 0, 0, 0, 0];
+let c = D.applyCricket([zero(), zero()], [0, 0], 0, [h(20, 3), h(20, 2), h(1, 3)]);
+assert.deepStrictEqual(c.marks[0], [3, 0, 0, 0, 0, 0, 0]);
+assert.strictEqual(c.points[0], 40);                       // T20 schliesst, D20 bringt 40
+assert.strictEqual(c.used, 3);
+// geschlossen beim Gegenüber: keine Punkte mehr
+c = D.applyCricket([[3, 0, 0, 0, 0, 0, 0], [3, 0, 0, 0, 0, 0, 0]], [0, 0], 1, [h(20, 3)]);
+assert.strictEqual(c.points[1], 0);
+// Bull: 25 zählt einfach, Bull doppelt
+c = D.applyCricket([[0, 0, 0, 0, 0, 0, 2], zero()], [0, 0], 0, [h(25, 2)]);
+assert.strictEqual(c.marks[0][6], 3);
+assert.strictEqual(c.points[0], 25);
+// Sieg: alles zu und gleich viele Punkte
+const almost = [3, 3, 3, 3, 3, 3, 2];
+c = D.applyCricket([almost, zero()], [0, 0], 0, [h(25, 1), h(20, 1)]);
+assert.strictEqual(c.win, true);
+assert.strictEqual(c.used, 1);
+// alles zu, aber weniger Punkte: noch nicht gewonnen
+c = D.applyCricket([almost, zero()], [0, 30], 0, [h(25, 1)]);
+assert.strictEqual(c.win, false);
+// … mit Punkten auf einem offenen Feld des Gegenübers schon
+c = D.applyCricket([almost, zero()], [0, 30], 0, [h(25, 1), h(20, 2)]);
+assert.strictEqual(c.win, true);
+assert.strictEqual(c.points[0], 40);
+// zu dritt: Punkte, solange noch jemand das Feld offen hat
+c = D.applyCricket([[3, 0, 0, 0, 0, 0, 0], [3, 0, 0, 0, 0, 0, 0], zero()], [0, 0, 0], 0, [h(20, 1)]);
+assert.strictEqual(c.points[0], 20);
+
+// Around the Clock
+assert.deepStrictEqual(D.applyClock(0, [h(1, 1), h(2, 3), h(5, 1)]), { pos: 2, win: false, used: 3 });
+assert.strictEqual(D.applyClock(0, [h(1, 3)]).pos, 1);        // Triple zählt als ein Treffer
+assert.strictEqual(D.applyClock(19, [h(20, 1), h(25, 1)]).win, true);
+assert.strictEqual(D.applyClock(20, [h(25, 2), h(20, 1)]).used, 1);
+
+console.log('Cricket- und Around-the-Clock-Tests bestanden.');

@@ -34,9 +34,11 @@
           <select id="setup-mode">
             <option value="501">501</option>
             <option value="301" selected>301</option>
+            <option value="cricket">Cricket</option>
+            <option value="clock">Around the Clock</option>
           </select>
         </label>
-        <label>Finish
+        <label id="setup-out-label">Finish
           <select id="setup-out">
             <option value="double">Double-Out</option>
             <option value="single" selected>Single-Out (Einsteigende)</option>
@@ -172,19 +174,23 @@
       <p class="hint">Beispiel: Rest 40 – ein Pfeil auf D20 beendet das Spiel. Rest 41 – zuerst 1, dann D20.</p>
     </section>
     <section class="card">
-      <h2>Cricket <small>(auf Papier)</small></h2>
+      <h2>Cricket</h2>
       <p>Es zählen nur 15–20 und Bull. Ein Feld ist geschlossen nach drei Treffern (Double zählt zwei,
-        Triple drei). Wer ein Feld geschlossen hat, sammelt dort Punkte, bis auch das Gegenüber es schliesst.
-        Wer alle Felder geschlossen hat und gleich viele oder mehr Punkte hat, gewinnt.</p>
+        Triple drei; das äussere Bull zählt einen, das innere zwei). Wer ein Feld geschlossen hat, sammelt dort
+        Punkte, bis auch das Gegenüber es schliesst – zu dritt oder zu viert, solange noch jemand anderes es
+        offen hat. Wer alle Felder geschlossen hat und gleich viele oder mehr Punkte hat, gewinnt.</p>
+      <p class="hint">Auf dem Tablet: / = ein Treffer, ✕ = zwei, eingekreist = geschlossen. Felder, die nichts
+        mehr bringen, sind auf der Scheibe abgedunkelt.</p>
     </section>
     <section class="card">
-      <h2>Around the Clock <small>(auf Papier)</small></h2>
-      <p>Der Reihe nach 1, 2, 3 … bis 20 treffen, zum Schluss das Bull. Wer zuerst durch ist, gewinnt.
-        Ideal zum Einsteigen.</p>
+      <h2>Around the Clock</h2>
+      <p>Der Reihe nach 1, 2, 3 … bis 20 treffen, zum Schluss das Bull (aussen oder innen). Double und
+        Triple zählen wie ein einfacher Treffer. Wer zuerst durch ist, gewinnt. Ideal zum Einsteigen.</p>
+      <p class="hint">Auf dem Tablet ist das nächste Ziel hell, alles andere abgedunkelt.</p>
     </section>
   </main>
 
-  <footer class="footer">Office Darts v0.1.4 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
+  <footer class="footer">Office Darts v0.1.5 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
 
   <script src="scoring.js"></script>
   <script src="app.js"></script>
