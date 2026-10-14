@@ -44,6 +44,8 @@ Später möglich: Daten zusätzlich an Neon senden, damit Ranglisten auch am Han
   zusammen spielt:
   - erstes Spiel gegeneinander: **10 Punkte**
   - danach `max(1, 10 / (1 + Anzahl bisheriger Spiele))` – also 5, 3, 2, … und mindestens 1
+  - gezählt werden nur die Spiele im selben Kalendermonat; jeden Monat gibt die erste Begegnung
+    wieder 10 Punkte. Die Punkte selbst werden über das Quartal bzw. die ganze Zeit summiert.
   - optional: Bonus, wenn die beiden aus verschiedenen Teams kommen (nur falls Teams erfasst werden)
   Getrennt von «Können», damit die Elo-Wertung fair bleibt.
 - **Saison:** Ranglisten pro Quartal neu, die Gesamtstatistik bleibt.

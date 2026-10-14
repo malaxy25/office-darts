@@ -60,9 +60,10 @@
     picked = picked.filter(id => players.some(p => p.id === id));
     $('#setup-empty').hidden = players.length > 0;
     // Wer als Erstes gewählt ist, sieht bei allen anderen, wie viele Vernetzungspunkte ein Spiel bringt.
-    const counts = Darts.pairCounts(db.games);
+    const month = Darts.monthOf(new Date());
+    const counts = Darts.pairCounts(db.games.filter(g => Darts.monthOf(g.date) === month));
     const me = picked[0];
-    const bonus = id => Darts.meetPoints(counts[Darts.pairKey(me, id)] ?? 0);
+    const bonus = id => Darts.meetPoints(counts[Darts.pairKey(me, id)] || 0);
     const best = Math.max(0, ...players.filter(p => !picked.includes(p.id)).map(p => bonus(p.id)));
     $('#setup-players').innerHTML = players.map(p => {
       const i = picked.indexOf(p.id);
@@ -259,6 +260,7 @@
 
   $('#btn-confirm').addEventListener('click', () => {
     if (!game) return;
+    const before = JSON.parse(JSON.stringify(game));
     const r = result();
     const p = game.current;
     game.thrown[p] += r.used;
@@ -274,7 +276,7 @@
     game.darts = [];
     editing = -1;
     if (r.win) {
-      finishGame(game.players[p]);
+      finishGame(game.players[p], before);
       return;
     }
     game.current = (p + 1) % game.players.length;
@@ -421,7 +423,8 @@
     });
   }
 
-  function finishGame(winner) {
+  // before: das Spiel vor der letzten Aufnahme – für «Zurück ins Spiel», falls falsch erfasst.
+  function finishGame(winner, before) {
     const g = game;
     const i = g.players.indexOf(winner);
     const x01 = isX01(g);
@@ -449,6 +452,14 @@
       // Revanche: Reihenfolge rotiert, damit jemand anderes beginnt.
       startGame(g.players.slice(1).concat(g.players[0]), settingsOf(g));
     };
+    $('#win-back').onclick = () => {
+      $('#win').hidden = true;
+      db.games = db.games.filter(x => x.id !== g.id);
+      saveDb();
+      game = before;
+      saveGame();
+      show('play');
+    };
     $('#win-new').onclick = () => {
       $('#win').hidden = true;
       picked = [];
@@ -472,7 +483,6 @@
   function renderRanking() {
     const sorted = db.games.slice().sort((a, b) => a.date.localeCompare(b.date));
     const from = season === 'quarter' ? quarterStart().toISOString() : '';
-    const before = sorted.filter(g => g.date < from);
     const games = sorted.filter(g => g.date >= from);
     const players = activePlayers();
 
@@ -486,8 +496,8 @@
           `<td class="num">${x.n}</td><td class="num">${x.w}</td></tr>`).join('')
       : '<tr><td class="hint">Noch keine Spiele.</td></tr>';
 
-    // Vernetzung: frühere Begegnungen zählen mit, damit ein «neues Quartal» keine neuen Erstbegegnungen erfindet.
-    const net = Darts.networkPoints(games, Darts.pairCounts(before));
+    // Vernetzung: das Gedächtnis «wie oft schon gegeneinander» beginnt jeden Kalendermonat neu.
+    const net = Darts.networkPoints(games);
     const netRows = players.filter(p => net.points[p.id])
       .map(p => ({ p, pts: net.points[p.id], opp: net.opponents[p.id].size }))
       .sort((a, b) => b.pts - a.pts);
@@ -505,14 +515,6 @@
     $('#never').innerHTML = never.length
       ? never.slice(0, 30).map(s => `<span>${s}</span>`).join('')
       : '<p class="hint">Alle haben schon gegeneinander gespielt. 🎉</p>';
-
-    const recent = sorted.slice(-15).reverse();
-    $('#table-games').innerHTML = recent.length
-      ? '<tr><th>Datum</th><th>Spiel</th><th>Spielende</th><th>Sieg</th><th></th></tr>' +
-        recent.map(g => `<tr><td>${new Date(g.date).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}</td>` +
-          `<td>${esc(g.mode)}</td><td>${g.players.map(id => esc(playerName(id))).join(', ')}</td>` +
-          `<td>${esc(playerName(g.winner))}</td><td class="num"><button class="del" data-game="${g.id}">Löschen</button></td></tr>`).join('')
-      : '<tr><td class="hint">Noch keine Spiele.</td></tr>';
   }
 
   // Zweimal tippen zum Löschen – kein Popup, das auf dem Tablet hängen bleibt.
@@ -531,16 +533,6 @@
       }, 3000);
     }
   }
-
-  $('#table-games').addEventListener('click', e => {
-    const b = e.target.closest('[data-game]');
-    if (!b) return;
-    twoTap(b, () => {
-      db.games = db.games.filter(g => g.id !== b.dataset.game);
-      saveDb();
-      renderRanking();
-    });
-  });
 
   // ---- Spielende ----
 

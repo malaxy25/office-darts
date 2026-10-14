@@ -43,13 +43,16 @@ assert.strictEqual(D.checkoutHint(41, 2, true).length, 2);
 
 // Vernetzung: 10, 5, 3, 2, 2, 1 …
 assert.deepStrictEqual([0, 1, 2, 3, 4, 9, 50].map(D.meetPoints), [10, 5, 3, 2, 2, 1, 1]);
-const g = (a, b, w = a) => ({ players: [a, b], winner: w });
+const g = (a, b, w = a, date = '2026-10-14T12:00:00') => ({ players: [a, b], winner: w, date });
 const net = D.networkPoints([g('a', 'b'), g('a', 'b'), g('a', 'c')]);
 assert.strictEqual(net.points.a, 25);
 assert.strictEqual(net.points.b, 15);
 assert.strictEqual(net.points.c, 10);
-// frühere Begegnungen zählen mit
-assert.strictEqual(D.networkPoints([g('a', 'b')], { 'a|b': 1 }).points.a, 5);
+// neuer Monat: erste Begegnung gibt wieder 10, die Punkte werden weiter summiert
+const nov = D.networkPoints([g('a', 'b'), g('a', 'b'), g('a', 'b', 'a', '2026-11-02T12:00:00')]);
+assert.strictEqual(nov.points.a, 25);
+// Anzahl Spiele pro Paar über alle Zeit
+assert.deepStrictEqual(D.pairCounts([g('a', 'b'), g('b', 'a', 'b', '2025-01-01T12:00:00')]), { 'a|b': 2 });
 
 // Elo: Sieg gegen Gleichstarke, neue Spielende K=48
 const elo = D.eloRatings([g('a', 'b')]);

@@ -227,3 +227,4 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
 
 .footer { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px 12px; }
 .footer a { color: var(--muted); }
+#win-back { margin-top: 8px; font-size: 15px; }

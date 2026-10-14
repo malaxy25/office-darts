@@ -189,32 +189,50 @@
     return before === 0 ? 10 : Math.max(1, Math.floor(10 / (1 + before)));
   }
 
-  // pairCounts: wie oft jedes Paar schon gespielt hat (vor dem Zeitraum der games).
-  function networkPoints(games, pairCounts = {}) {
-    const counts = { ...pairCounts }, points = {}, opponents = {};
+  // Kalendermonat (Ortszeit) als Zahl, z. B. für «Oktober 2026».
+  function monthOf(date) {
+    const d = new Date(date);
+    return d.getFullYear() * 12 + d.getMonth();
+  }
+
+  // Wie oft jedes Paar in den games gespielt hat.
+  function pairCounts(games) {
+    const counts = {};
     for (const g of games) {
       const ps = g.players;
       for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
         const k = pairKey(ps[i], ps[j]);
-        const pts = meetPoints(counts[k] ?? 0);
-        counts[k] = (counts[k] ?? 0) + 1;
+        counts[k] = (counts[k] || 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  // Die Punkte eines Spiels hängen davon ab, wie oft das Paar im selben Kalendermonat schon gespielt
+  // hat – jeden Monat gibt die erste Begegnung wieder 10. Summiert wird über alle games.
+  function networkPoints(games) {
+    const counts = {}, points = {}, opponents = {};
+    for (const g of games) {
+      const ps = g.players;
+      const month = monthOf(g.date);
+      for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+        const k = month + ':' + pairKey(ps[i], ps[j]);
+        const pts = meetPoints(counts[k] || 0);
+        counts[k] = (counts[k] || 0) + 1;
         for (const p of [ps[i], ps[j]]) {
-          points[p] = (points[p] ?? 0) + pts;
-          (opponents[p] ??= new Set()).add(p === ps[i] ? ps[j] : ps[i]);
+          points[p] = (points[p] || 0) + pts;
+          if (!opponents[p]) opponents[p] = new Set();
+          opponents[p].add(p === ps[i] ? ps[j] : ps[i]);
         }
       }
     }
-    return { points, opponents, counts };
-  }
-
-  function pairCounts(games) {
-    return networkPoints(games).counts;
+    return { points, opponents };
   }
 
   const api = {
     SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
     CRICKET, applyCricket, CLOCK, applyClock,
-    ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey,
+    ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey, monthOf,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Darts = api;

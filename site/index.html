@@ -83,6 +83,7 @@
         <button id="win-rematch" class="primary">Revanche</button>
         <button id="win-new">Neues Spiel</button>
       </div>
+      <button id="win-back" class="link">Falsch erfasst? Zurück ins Spiel</button>
     </div>
   </div>
 
@@ -97,12 +98,14 @@
     <div class="grid2">
       <section class="card">
         <h2>Können <small>Elo</small></h2>
-        <p class="hint">Wer gegen Stärkere gewinnt, steigt mehr.</p>
+        <p class="hint">Alle starten bei 1000. Wer gegen Stärkere gewinnt, steigt mehr. 100 Punkte Unterschied:
+          die stärkere Person gewinnt etwa 2 von 3 Spielen, bei 200 Punkten etwa 3 von 4.</p>
         <table id="table-elo"></table>
       </section>
       <section class="card">
         <h2>Vernetzung</h2>
-        <p class="hint">Erstes Spiel gegen jemanden: 10 Punkte, danach 5, 3, 2 … mindestens 1.</p>
+        <p class="hint">Erstes Spiel im Monat gegen jemanden: 10 Punkte, danach 5, 3, 2 … mindestens 1.
+          Jeden Monat beginnt das wieder bei 10.</p>
         <table id="table-net"></table>
       </section>
     </div>
@@ -110,10 +113,6 @@
       <h2>Mit wem noch nie?</h2>
       <p class="hint">Paare, die noch nie gegeneinander gespielt haben.</p>
       <div id="never" class="chips static"></div>
-    </section>
-    <section class="card">
-      <h2>Letzte Spiele</h2>
-      <table id="table-games"></table>
     </section>
   </main>
 
@@ -190,7 +189,7 @@
     </section>
   </main>
 
-  <footer class="footer">Office Darts v0.1.5 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
+  <footer class="footer">Office Darts v0.1.6 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
 
   <script src="scoring.js"></script>
   <script src="app.js"></script>
