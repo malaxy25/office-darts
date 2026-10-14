@@ -12,13 +12,15 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="banner">Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.</div>
+  <div id="banner" class="banner">Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.</div>
 
   <nav class="tabs">
+    <span id="brand" class="brand">Office Darts</span>
     <button data-view="play" class="active">Spielen</button>
     <button data-view="ranking">Rangliste</button>
     <button data-view="players">Spielende</button>
     <button data-view="rules">Regeln</button>
+    <button data-view="settings">Einstellungen</button>
     <button id="btn-abort" class="link abort" hidden>Spiel abbrechen</button>
   </nav>
 
@@ -28,6 +30,7 @@
       <h2>Neues Spiel</h2>
       <p id="setup-hint" class="hint">Spielende in Wurfreihenfolge antippen (2–4).</p>
       <div id="setup-players" class="chips"></div>
+      <p id="setup-backup" class="hint warn" hidden></p>
       <p id="setup-empty" class="hint" hidden>Noch niemand erfasst – unter «Spielende» Namen hinzufügen.</p>
       <div class="row">
         <label>Spiel
@@ -89,9 +92,9 @@
 
   <!-- Rangliste -->
   <main id="view-ranking" class="view" hidden>
-    <div class="row">
+    <div id="season-row" class="row">
       <div class="segmented">
-        <button data-season="quarter" class="active">Dieses Quartal</button>
+        <button data-season="period" class="active">Dieses Quartal</button>
         <button data-season="all">Gesamt</button>
       </div>
     </div>
@@ -127,14 +130,66 @@
       </form>
       <ul id="player-list" class="list"></ul>
     </section>
+  </main>
+
+  <!-- Einstellungen -->
+  <main id="view-settings" class="view" hidden>
     <section class="card">
       <h2>Sicherung</h2>
       <p class="hint">Alles liegt im Speicher dieses Browsers. Ab und zu sichern – wer die Browserdaten löscht, löscht auch die Resultate.</p>
+      <p id="backup-status" class="hint"></p>
       <div class="row buttons">
         <button id="btn-export">Sicherung herunterladen</button>
         <label class="button">Sicherung laden<input id="file-import" type="file" accept="application/json" hidden></label>
       </div>
     </section>
+    <section class="card">
+      <h2>Spiel und Rangliste</h2>
+      <div class="row">
+        <label>Vorgewähltes Spiel
+          <select id="set-mode">
+            <option value="501">501</option>
+            <option value="301">301</option>
+            <option value="cricket">Cricket</option>
+            <option value="clock">Around the Clock</option>
+          </select>
+        </label>
+        <label>Vorgewähltes Finish
+          <select id="set-out">
+            <option value="double">Double-Out</option>
+            <option value="single">Single-Out (Einsteigende)</option>
+          </select>
+        </label>
+        <label>Ranglisten zählen
+          <select id="set-period">
+            <option value="all">über die ganze Zeit</option>
+            <option value="quarter">pro Quartal (neu ab 1. Jan., Apr., Jul., Okt.)</option>
+            <option value="month">pro Monat</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">Bei «pro Quartal» oder «pro Monat» lässt sich in der Rangliste trotzdem «Gesamt» ansehen.</p>
+    </section>
+    <section class="card">
+      <h2>Anzeige</h2>
+      <div class="row">
+        <label class="grow">Name
+          <input id="set-name" maxlength="40" autocomplete="off">
+        </label>
+        <label class="grow">Banner (leer = kein Banner)
+          <input id="set-banner" maxlength="120" autocomplete="off">
+        </label>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Neu beginnen</h2>
+      <p class="hint">Vorher sichern! Gelöscht ist gelöscht. Zweimal tippen zum Bestätigen.</p>
+      <div class="row buttons">
+        <button id="btn-clear-games">Alle Spiele löschen (Spielende bleiben)</button>
+        <button id="btn-clear-all">Alles löschen</button>
+      </div>
+    </section>
+    <p class="about">Office Darts v0.1.7 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></p>
   </main>
 
   <!-- Regeln -->
@@ -189,7 +244,6 @@
     </section>
   </main>
 
-  <footer class="footer">Office Darts v0.1.6 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
 
   <script src="scoring.js"></script>
   <script src="app.js"></script>

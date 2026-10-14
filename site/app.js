@@ -11,6 +11,7 @@
 
   const KEY = 'officeDarts.v1';
   const KEY_GAME = 'officeDarts.current';
+  const KEY_BACKUP = 'officeDarts.lastBackup';
 
   function load(key, fallback) {
     try {
@@ -32,6 +33,16 @@
   const saveDb = () => save(KEY, db);
   const saveGame = () => save(KEY_GAME, game);
 
+  // Einstellungen liegen in db und kommen so mit in die Sicherung.
+  const DEFAULTS = {
+    name: 'Office Darts',
+    banner: 'Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.',
+    mode: '301',
+    out: 'single',
+    period: 'all',   // Ranglisten: 'all', 'quarter' oder 'month'
+  };
+  const setting = k => db.settings && k in db.settings ? db.settings[k] : DEFAULTS[k];
+
   const activePlayers = () => db.players.filter(p => !p.deleted);
   const playerName = id => (db.players.find(p => p.id === id) || { name: '?' }).name;
 
@@ -41,13 +52,13 @@
     $$('.tabs button[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     const id = view === 'play' ? (game ? 'view-play' : 'view-setup') : 'view-' + view;
     $$('main.view').forEach(m => { m.hidden = m.id !== id; });
-    $('.footer').hidden = id === 'view-play';
     document.body.classList.toggle('playing', id === 'view-play');
     $('#btn-abort').hidden = id !== 'view-play';
     if (id === 'view-setup') renderSetup();
     if (id === 'view-play') renderPlay();
     if (view === 'ranking') renderRanking();
     if (view === 'players') renderPlayers();
+    if (view === 'settings') renderSettings();
   }
   $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
 
@@ -79,6 +90,9 @@
       ? `+Punkte: was ein Spiel ${playerName(me)} in der Rangliste «Vernetzung» bringt. ★ = am meisten.`
       : 'Spielende in Wurfreihenfolge antippen (2–4).';
     $('#setup-start').disabled = picked.length < 2;
+    const days = backupDue();
+    $('#setup-backup').hidden = days === null;
+    if (days !== null) $('#setup-backup').textContent = backupText(days) + ' – unter «Einstellungen» sichern.';
   }
 
   $('#setup-players').addEventListener('click', e => {
@@ -469,20 +483,26 @@
 
   // ---- Rangliste ----
 
-  let season = 'quarter';
+  // Ansicht der Rangliste: 'period' (Quartal/Monat gemäss Einstellung) oder 'all'.
+  let season = 'period';
   $$('[data-season]').forEach(b => b.addEventListener('click', () => {
     season = b.dataset.season;
-    $$('[data-season]').forEach(x => x.classList.toggle('active', x === b));
     renderRanking();
   }));
 
-  function quarterStart(d = new Date()) {
+  function periodStart(period) {
+    const d = new Date();
+    if (period === 'month') return new Date(d.getFullYear(), d.getMonth(), 1);
     return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1);
   }
 
   function renderRanking() {
+    const period = setting('period');
+    $('#season-row').hidden = period === 'all';
+    $('[data-season="period"]').textContent = period === 'month' ? 'Dieser Monat' : 'Dieses Quartal';
+    $$('[data-season]').forEach(x => x.classList.toggle('active', x.dataset.season === season));
     const sorted = db.games.slice().sort((a, b) => a.date.localeCompare(b.date));
-    const from = season === 'quarter' ? quarterStart().toISOString() : '';
+    const from = period !== 'all' && season === 'period' ? periodStart(period).toISOString() : '';
     const games = sorted.filter(g => g.date >= from);
     const players = activePlayers();
 
@@ -522,13 +542,14 @@
     if (button.dataset.armed) {
       action();
     } else {
+      const label = button.textContent;
       button.dataset.armed = '1';
       button.textContent = 'Sicher?';
       button.classList.add('danger');
       setTimeout(() => {
-        if (!button.isConnected) return;
+        if (!button.isConnected || !button.dataset.armed) return;
         delete button.dataset.armed;
-        button.textContent = 'Löschen';
+        button.textContent = label;
         button.classList.remove('danger');
       }, 3000);
     }
@@ -573,6 +594,76 @@
     });
   });
 
+  // ---- Einstellungen ----
+
+  const DAY = 24 * 3600 * 1000;
+
+  // Tage seit der letzten Sicherung, falls seit über 14 Tagen ungesicherte Spiele da sind – sonst null.
+  // Ohne Sicherung zählt das älteste Spiel.
+  function backupDue() {
+    const last = load(KEY_BACKUP, null);
+    const unsaved = db.games.filter(g => !last || g.date > last);
+    if (!unsaved.length) return null;
+    const since = last || unsaved.reduce((m, g) => g.date < m ? g.date : m, unsaved[0].date);
+    const days = Math.floor((Date.now() - new Date(since).getTime()) / DAY);
+    return days >= 14 ? days : null;
+  }
+  function backupText(days) {
+    return load(KEY_BACKUP, null) ? `Letzte Sicherung vor ${days} Tagen` : 'Noch nie gesichert';
+  }
+
+  function applySettings() {
+    document.title = setting('name');
+    $('#brand').textContent = setting('name');
+    $('#banner').textContent = setting('banner');
+    $('#banner').hidden = !setting('banner');
+    $('#setup-mode').value = setting('mode');
+    $('#setup-out').value = setting('out');
+    $('#setup-out-label').hidden = setupMode() !== 'x01';
+  }
+
+  function renderSettings() {
+    $('#set-mode').value = setting('mode');
+    $('#set-out').value = setting('out');
+    $('#set-period').value = setting('period');
+    $('#set-name').value = setting('name');
+    $('#set-banner').value = setting('banner');
+    const last = load(KEY_BACKUP, null);
+    $('#backup-status').textContent = last
+      ? `Letzte Sicherung: ${new Date(last).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}`
+      : 'Noch nie gesichert.';
+  }
+
+  [['#set-mode', 'mode'], ['#set-out', 'out'], ['#set-period', 'period'], ['#set-name', 'name'], ['#set-banner', 'banner']]
+    .forEach(([sel, key]) => $(sel).addEventListener('change', e => {
+      if (!db.settings) db.settings = {};
+      const v = e.target.value.trim();
+      // Leerer Name heisst Standard; leeres Banner heisst kein Banner.
+      db.settings[key] = key === 'name' && !v ? DEFAULTS.name : v;
+      saveDb();
+      season = 'period';
+      applySettings();
+      renderSettings();
+    }));
+
+  function clearData(all) {
+    db.games = [];
+    if (all) db.players = [];
+    saveDb();
+    game = null;
+    saveGame();
+    picked = [];
+    save(KEY_BACKUP, null);
+  }
+  $('#btn-clear-games').addEventListener('click', e => {
+    const b = e.currentTarget;
+    twoTap(b, () => { clearData(false); delete b.dataset.armed; b.classList.remove('danger'); b.textContent = 'Spiele gelöscht ✓'; });
+  });
+  $('#btn-clear-all').addEventListener('click', e => {
+    const b = e.currentTarget;
+    twoTap(b, () => { clearData(true); delete b.dataset.armed; b.classList.remove('danger'); b.textContent = 'Alles gelöscht ✓'; });
+  });
+
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -580,6 +671,8 @@
     a.download = `office-darts-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    save(KEY_BACKUP, new Date().toISOString());
+    renderSettings();
   });
 
   $('#file-import').addEventListener('change', async e => {
@@ -590,7 +683,8 @@
       if (!Array.isArray(data.players) || !Array.isArray(data.games)) throw new Error('format');
       db = data;
       saveDb();
-      renderPlayers();
+      applySettings();
+      renderSettings();
       e.target.value = '';
       e.target.parentElement.firstChild.textContent = 'Geladen ✓';
     } catch (err) {
@@ -601,5 +695,6 @@
   // ---- Start ----
 
   drawBoard();
+  applySettings();
   show('play');
 })();

@@ -25,7 +25,9 @@ von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja da
 - 501/301, Double-Out oder Single-Out, Überworfen-Regel, Finish-Vorschlag, Korrigieren pro Pfeil.
 - Cricket (Tafel mit / ✕ und geschlossenen Feldern) und Around the Clock (Ziel auf der Scheibe hell).
   Alle Spielarten zählen gemeinsam für die Ranglisten.
-- Ranglisten «Können» (Elo) und «Vernetzung» pro Quartal, «Mit wem noch nie?».
+- Ranglisten «Können» (Elo) und «Vernetzung» – über die ganze Zeit, wahlweise pro Quartal oder Monat –,
+  «Mit wem noch nie?».
+- Einstellungen: Sicherung (mit Erinnerung nach 14 Tagen), vorgewähltes Spiel, Name, Banner, Neu beginnen.
 - Daten bleiben im Browser des Tablets (localStorage). Sicherung als JSON herunterladen/laden.
 - Reine statische Seite → gratis als Render Static Site, schläft nie.
 
@@ -45,10 +47,10 @@ Später möglich: Daten zusätzlich an Neon senden, damit Ranglisten auch am Han
   - erstes Spiel gegeneinander: **10 Punkte**
   - danach `max(1, 10 / (1 + Anzahl bisheriger Spiele))` – also 5, 3, 2, … und mindestens 1
   - gezählt werden nur die Spiele im selben Kalendermonat; jeden Monat gibt die erste Begegnung
-    wieder 10 Punkte. Die Punkte selbst werden über das Quartal bzw. die ganze Zeit summiert.
+    wieder 10 Punkte. Die Punkte selbst werden über den gewählten Zeitraum summiert.
   - optional: Bonus, wenn die beiden aus verschiedenen Teams kommen (nur falls Teams erfasst werden)
   Getrennt von «Können», damit die Elo-Wertung fair bleibt.
-- **Saison:** Ranglisten pro Quartal neu, die Gesamtstatistik bleibt.
+- **Saison:** Ranglisten standardmässig über die ganze Zeit; pro Quartal oder Monat als Einstellung.
 
 ## Phase 3 – Vorschläge «Mit wem spiele ich?»
 

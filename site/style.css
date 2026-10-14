@@ -225,6 +225,10 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
   .dart { min-height: 52px; font-size: 20px; }
 }
 
-.footer { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px 12px; }
-.footer a { color: var(--muted); }
+.brand { align-self: center; font-weight: 700; margin-right: 12px; white-space: nowrap; }
+body.playing .brand { display: none; }
+.hint.warn { color: var(--warn); }
+.row label.grow { flex: 1; min-width: 240px; }
+.about { text-align: center; color: var(--muted); font-size: 13px; }
+.about a { color: var(--muted); }
 #win-back { margin-top: 8px; font-size: 15px; }
