@@ -19,6 +19,7 @@
     <button data-view="ranking">Rangliste</button>
     <button data-view="players">Spielende</button>
     <button data-view="rules">Regeln</button>
+    <button id="btn-abort" class="link abort" hidden>Spiel abbrechen</button>
   </nav>
 
   <!-- Neues Spiel -->
@@ -50,7 +51,7 @@
   <main id="view-play" class="view" hidden>
     <div class="play">
       <div class="board-wrap">
-        <svg id="board" viewBox="-245 -245 490 490" aria-label="Dartscheibe – antippen, wo der Pfeil steckt"></svg>
+        <svg id="board" viewBox="-232 -232 464 464" aria-label="Dartscheibe – antippen, wo der Pfeil steckt"></svg>
       </div>
       <aside class="panel">
         <div id="scores" class="scores"></div>
@@ -67,7 +68,6 @@
           </div>
           <button id="btn-confirm" class="primary big" disabled>Bestätigen</button>
         </div>
-        <button id="btn-abort" class="link">Spiel abbrechen</button>
       </aside>
     </div>
   </main>
@@ -184,7 +184,7 @@
     </section>
   </main>
 
-  <footer class="footer">Office Darts v0.1.2 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
+  <footer class="footer">Office Darts v0.1.3 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></footer>
 
   <script src="scoring.js"></script>
   <script src="app.js"></script>

@@ -50,6 +50,12 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
   padding: 10px 14px;
 }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.tabs .abort { margin-left: auto; border-bottom: none; text-decoration: underline; }
+
+/* Im Spiel: Kopfzeile schmal, damit die Scheibe Platz hat. */
+body.playing .banner { padding: 3px 12px; font-size: 13px; }
+body.playing .tabs { padding-top: 2px; }
+body.playing .tabs button { padding: 6px 12px; min-height: 40px; }
 
 .view { padding: 16px; flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; }
 
@@ -116,13 +122,14 @@ td .del { min-height: 36px; padding: 4px 10px; font-size: 14px; }
 .list { list-style: none; padding: 0; margin: 12px 0 0; }
 .list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 
-/* Spiel */
-.view#view-play { max-width: none; padding: 12px; }
-.play { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; height: calc(100vh - 120px); }
-.board-wrap { display: flex; align-items: center; justify-content: center; min-height: 0; }
-#board { width: 100%; height: 100%; max-height: calc(100vh - 130px); touch-action: manipulation; user-select: none; }
+/* Spiel: die Seite füllt genau den Bildschirm, die Scheibe nimmt den Platz, der übrig bleibt. */
+body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
+.view#view-play { max-width: none; padding: 8px 12px; display: flex; min-height: 0; }
+.play { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(260px, 30vw, 380px); gap: 12px; }
+.board-wrap { display: flex; align-items: center; justify-content: center; min-height: 0; min-width: 0; }
+#board { width: 100%; height: 100%; touch-action: manipulation; user-select: none; }
 #board .seg { cursor: crosshair; }
-#board .num { fill: var(--text); font-size: 22px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+#board .num { fill: var(--text); font-size: 21px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 #board .wire { fill: none; stroke: #9aa0a6; stroke-width: .8; pointer-events: none; }
 #board .mark circle { fill: #fff; stroke: #111; stroke-width: 2; }
 #board .mark text { fill: #111; font-size: 13px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
@@ -169,9 +176,31 @@ td .del { min-height: 36px; padding: 4px 10px; font-size: 14px; }
 .rules li { margin: 4px 0; }
 
 @media (max-width: 900px) {
-  .play { grid-template-columns: 1fr; height: auto; }
-  #board { max-height: 70vh; }
   .grid2 { grid-template-columns: 1fr; }
+}
+
+/* Hochformat: Scheibe oben, darunter kompakt Punktestände und Erfassung. */
+@media (orientation: portrait) {
+  .play { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; gap: 10px; }
+  .panel { gap: 8px; overflow: visible; }
+  .scores { grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .score { padding: 4px 10px; align-items: center; }
+  .score .name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .score .avg { display: block; margin-left: 0; font-size: 12px; }
+  .score .pts { font-size: 22px; }
+  /* Erfassung in zwei Zeilen: Pfeile + Rückgängig, Daneben + Bestätigen. Der Rest steht in der Spielerkarte. */
+  .turn {
+    padding: 8px 10px; display: grid; gap: 6px 8px; grid-template-columns: repeat(4, 1fr);
+    grid-template-areas: "darts darts darts undo" "info info info info" "miss confirm confirm confirm";
+  }
+  .turn-head { display: none; }
+  .turn .row.buttons { display: contents; }
+  #darts { grid-area: darts; margin: 0; }
+  #btn-undo { grid-area: undo; }
+  #btn-miss { grid-area: miss; }
+  #btn-confirm { grid-area: confirm; margin: 0; min-height: 52px; font-size: 18px; }
+  .turn-info { grid-area: info; min-height: 20px; font-size: 14px; }
+  .dart { min-height: 52px; font-size: 20px; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px 12px; }

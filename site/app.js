@@ -42,6 +42,8 @@
     const id = view === 'play' ? (game ? 'view-play' : 'view-setup') : 'view-' + view;
     $$('main.view').forEach(m => { m.hidden = m.id !== id; });
     $('.footer').hidden = id === 'view-play';
+    document.body.classList.toggle('playing', id === 'view-play');
+    $('#btn-abort').hidden = id !== 'view-play';
     if (id === 'view-setup') renderSetup();
     if (id === 'view-play') renderPlay();
     if (view === 'ranking') renderRanking();
@@ -132,7 +134,7 @@
     const R = Darts.RINGS;
     const css = getComputedStyle(document.documentElement);
     const c = name => css.getPropertyValue(name).trim();
-    el('circle', { r: R.numbers + 10, fill: '#0c0c0c', class: 'seg' }, board);
+    el('circle', { r: R.numbers, fill: '#0c0c0c', class: 'seg' }, board);
     Darts.SEGMENTS.forEach((n, i) => {
       const a1 = i * 18 - 9, a2 = a1 + 18;
       const dark = i % 2 === 0;
@@ -142,7 +144,7 @@
       el('path', { d: sector(R.tripleIn, R.tripleOut, a1, a2), fill: ring, class: 'seg' }, board);
       el('path', { d: sector(R.tripleOut, R.doubleIn, a1, a2), fill: plain, class: 'seg' }, board);
       el('path', { d: sector(R.doubleIn, R.doubleOut, a1, a2), fill: ring, class: 'seg' }, board);
-      const [x, y] = pt((R.doubleOut + R.numbers + 10) / 2, i * 18);
+      const [x, y] = pt((R.doubleOut + R.numbers) / 2, i * 18);
       el('text', { x, y, class: 'num' }, board).textContent = n;
     });
     el('circle', { r: R.bullOut, fill: c('--board-green'), class: 'seg' }, board);
@@ -265,7 +267,7 @@
 
     $('#scores').innerHTML = game.players.map((id, i) =>
       `<div class="score ${i === p ? 'current' : ''}"><span class="name">${esc(playerName(id))}` +
-      `<span class="avg">Ø ${avg(i)}</span></span><span class="pts">${game.rest[i]}</span></div>`
+      `<span class="avg">Ø ${avg(i)}</span></span><span class="pts">${i === p && !r.bust ? r.remaining : game.rest[i]}</span></div>`
     ).join('');
 
     $('#turn-name').textContent = playerName(game.players[p]);

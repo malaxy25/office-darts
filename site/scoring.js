@@ -9,7 +9,7 @@
     bullIn: 13, bullOut: 28,
     tripleIn: 112, tripleOut: 142,
     doubleIn: 170, doubleOut: 200,
-    numbers: 228,
+    numbers: 230,
   };
 
   const MISS = { value: 0, mult: 0, points: 0, label: '0' };
