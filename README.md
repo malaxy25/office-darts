@@ -4,7 +4,8 @@ Eine kleine Website für die Dartscheibe im Büro: Spielregeln, Hausregeln, Resu
 und Vorschläge, mit wem man als Nächstes spielen könnte. Ziel ist nicht nur Spass, sondern dass
 Leute zusammen spielen, die sich im Arbeitsalltag sonst kaum begegnen.
 
-> **Status:** Idee und Plan. Noch kein Code. Siehe [PLAN.md](PLAN.md).
+> **Status:** Tablet-App im Ordner [`site/`](site/) – Treffer auf der Scheibe antippen, Resultat und
+> Ranglisten ergeben sich daraus. Tests: `node test/scoring.test.js`. Weiteres in [PLAN.md](PLAN.md).
 
 ## Grundsätze
 

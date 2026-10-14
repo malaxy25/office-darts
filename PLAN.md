@@ -16,6 +16,19 @@ Eine statische Seite, sofort einsetzbar, auch ohne Ranglisten:
   Lautstärke; Pfeile zurück in den Halter; defekte Pfeile melden.
 - **Erste Schritte:** Wie man ausbullt, wer beginnt, wie gezählt wird.
 
+## Phase 1b – Tablet an der Scheibe (umgesetzt, Ordner `site/`)
+
+Ein Tablet hängt neben der Scheibe. Dort werden die Treffer direkt erfasst, das Resultat ergibt sich
+von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja daneben).
+
+- Scheibe antippen, wo die drei Pfeile stecken → «Bestätigen» → nächste Person.
+- 501/301, Double-Out oder Single-Out, Überworfen-Regel, Finish-Vorschlag, Korrigieren pro Pfeil.
+- Ranglisten «Können» (Elo) und «Vernetzung» pro Quartal, «Mit wem noch nie?».
+- Daten bleiben im Browser des Tablets (localStorage). Sicherung als JSON herunterladen/laden.
+- Reine statische Seite → gratis als Render Static Site, schläft nie.
+
+Später möglich: Daten zusätzlich an Neon senden, damit Ranglisten auch am Handy sichtbar sind.
+
 ## Phase 2 – Resultate und Ranglisten
 
 - **Anmelden:** einfach halten. Varianten (zu entscheiden):

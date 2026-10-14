@@ -1,0 +1,10 @@
+{
+  "name": "Office Darts",
+  "short_name": "Darts",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#14181f",
+  "theme_color": "#14181f",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
