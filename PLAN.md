@@ -75,6 +75,16 @@ Alles soll **kostenlos** bleiben (Stand Oktober 2026):
   Datei-Datenbank (SQLite) auf Render: die Gratis-Instanz hat keine bleibende Festplatte.
 - **Tests** für die Wertungen (Elo, Vernetzungspunkte, Vorschläge) von Anfang an.
 
+## Backlog
+
+- [ ] **Läuft auch auf alten iPads (iOS 12 / Safari 12)**, z. B. iPad Air 1 (ME988). Keine
+  Geräteerkennung, sondern ein Code für alle Geräte:
+  - JavaScript ohne `??` und `??=` (startet sonst auf Safari 12 gar nicht); `file.text()` durch
+    `FileReader` ersetzen.
+  - CSS mit Ersatzregeln: `clamp()` (Spaltenbreite im Querformat), `inset` (Sieg-Fenster),
+    `gap` bei Flexbox (Abstände der Knöpfe), `display: contents` (Erfassung im Hochformat), `dvh`.
+  - Schlusstest auf dem echten Gerät (Safari 12 lässt sich hier nicht nachstellen).
+
 ## Offene Fragen
 
 1. **Freigabe:** Geschäftsleitung bzw. HR – Aufhängen der Scheibe, Ort, und die Formulierung
