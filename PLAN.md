@@ -28,6 +28,7 @@ von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja da
 - Ranglisten «Können» (Elo) und «Vernetzung» – Standard «Gesamt», Filter nach Jahr, Quartal oder Monat –,
   Ehrentafel mit den Besten jedes abgeschlossenen Zeitraums, «Mit wem noch nie?».
 - Einstellungen: Sicherung (mit Erinnerung nach 14 Tagen), vorgewähltes Spiel, Name, Banner, Neu beginnen.
+- Bildschirm bleibt an, solange die App offen ist (Wake Lock).
 - Daten bleiben im Browser des Tablets (localStorage). Sicherung als JSON herunterladen/laden.
 - Reine statische Seite → gratis als Render Static Site, schläft nie.
 

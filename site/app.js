@@ -737,9 +737,27 @@
     }
   });
 
+  // ---- Bildschirm wach halten ----
+  // Das Tablet hängt an der Scheibe; der Bildschirm soll nicht ausgehen.
+  // Android/Chrome gibt die Sperre frei, sobald die Seite verdeckt ist – daher neu anfordern.
+
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!('wakeLock' in navigator) || wakeLock || document.visibilityState !== 'visible') return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (err) {
+      wakeLock = null;
+    }
+  }
+  document.addEventListener('visibilitychange', keepAwake);
+  document.addEventListener('click', keepAwake);
+
   // ---- Start ----
 
   drawBoard();
   applySettings();
   show('play');
+  keepAwake();
 })();
