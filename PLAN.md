@@ -30,9 +30,12 @@ von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja da
 - Einstellungen: Sicherung (mit Erinnerung nach 14 Tagen), vorgewähltes Spiel, Name, Banner, Neu beginnen.
 - Bildschirm bleibt an, solange die App offen ist (Wake Lock).
 - Daten bleiben im Browser des Tablets (localStorage). Sicherung als JSON herunterladen/laden.
+- Speicher: «Dauerhaft speichern» (Browser räumt nicht von selbst auf) und optional Neon – nach jeder
+  Änderung wird der ganze Stand angehängt (Benutzer `darts_tablet` darf nur anhängen und lesen, die
+  letzten 200 Stände bleiben). Zugang nur auf dem Tablet eingetragen, nicht im Code.
 - Reine statische Seite → gratis als Render Static Site, schläft nie.
 
-Später möglich: Daten zusätzlich an Neon senden, damit Ranglisten auch am Handy sichtbar sind.
+Später möglich: Ranglisten aus Neon auch am Handy anzeigen.
 
 ## Phase 2 – Resultate und Ranglisten
 

@@ -12,6 +12,8 @@
   const KEY = 'officeDarts.v1';
   const KEY_GAME = 'officeDarts.current';
   const KEY_BACKUP = 'officeDarts.lastBackup';
+  // Zugang zur Datenbank – bewusst nicht in db, damit er nicht in der Sicherungsdatei landet.
+  const KEY_CLOUD = 'officeDarts.cloud';
 
   function load(key, fallback) {
     try {
@@ -30,7 +32,7 @@
 
   let db = load(KEY, { players: [], games: [] });
   let game = load(KEY_GAME, null);
-  const saveDb = () => save(KEY, db);
+  const saveDb = () => { save(KEY, db); cloudChanged(); };
   const saveGame = () => save(KEY_GAME, game);
 
   // Einstellungen liegen in db und kommen so mit in die Sicherung.
@@ -674,6 +676,9 @@
     $('#set-out').value = setting('out');
     $('#set-name').value = setting('name');
     $('#set-banner').value = setting('banner');
+    if (document.activeElement !== $('#cloud-url')) $('#cloud-url').value = cloud.url;
+    renderCloud();
+    renderPersist();
     const last = load(KEY_BACKUP, null);
     $('#backup-status').textContent = last
       ? `Letzte Sicherung: ${new Date(last).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}`
@@ -737,6 +742,150 @@
     }
   });
 
+  // ---- Dauerhaft speichern ----
+  // Ohne diese Erlaubnis darf der Browser die Daten bei Platzmangel wegräumen.
+  // Safari 12 kennt navigator.storage nicht – dort hilft «Zum Home-Bildschirm».
+
+  async function renderPersist() {
+    const s = navigator.storage;
+    const status = $('#persist-status');
+    const button = $('#btn-persist');
+    if (!s || !s.persisted) {
+      status.textContent = 'Dieser Browser kann das nicht. Tipp: die Seite zum Home-Bildschirm hinzufügen.';
+      button.hidden = true;
+      return;
+    }
+    const on = await s.persisted();
+    status.textContent = on
+      ? 'Dauerhaft gespeichert ✓ – der Browser räumt die Daten nicht von selbst weg.'
+      : 'Nicht dauerhaft: bei wenig Platz darf der Browser die Daten löschen.';
+    button.hidden = on;
+  }
+  $('#btn-persist').addEventListener('click', async () => {
+    const ok = await navigator.storage.persist();
+    await renderPersist();
+    if (!ok) $('#persist-status').textContent = 'Abgelehnt. Tipp: die Seite zum Home-Bildschirm hinzufügen und nochmals versuchen.';
+  });
+
+  // ---- Datenbank (Neon) ----
+  // Neon nimmt SQL per HTTPS an; ein eigener Server ist nicht nötig. Jeder Stand wird als neue Zeile
+  // angehängt (darts_save), das Tablet darf nichts ändern oder löschen – siehe Einrichtung in index.html.
+
+  let cloud = load(KEY_CLOUD, { url: '', last: null, dirty: false });
+  let cloudTimer = null;
+  let cloudError = '';
+
+  function neonEndpoint(url) {
+    const m = /^postgres(?:ql)?:\/\/[^@\/]+@([^\/:?]+)/.exec(url.trim());
+    if (!m) throw new Error('Verbindung ungültig – sie beginnt mit postgresql:// und enthält @');
+    return 'https://' + m[1].replace(/^[^.]+\./, 'api.') + '/sql';
+  }
+
+  async function neonQuery(query, params) {
+    // Ohne Content-Type: application/json wäre für Neon eine nicht erlaubte Kopfzeile (CORS).
+    const res = await fetch(neonEndpoint(cloud.url), {
+      method: 'POST',
+      headers: { 'Neon-Connection-String': cloud.url.trim(), 'Neon-Raw-Text-Output': 'true' },
+      body: JSON.stringify({ query, params: params || [] }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || 'Fehler ' + res.status);
+    return body.rows || [];
+  }
+
+  function saveCloud() { save(KEY_CLOUD, cloud); }
+
+  // Nach jeder Änderung kurz warten – mehrere Änderungen hintereinander gehen in einem Rutsch.
+  function cloudChanged() {
+    if (!cloud.url) return;
+    cloud.dirty = true;
+    saveCloud();
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(cloudPush, 3000);
+  }
+
+  async function cloudPush() {
+    clearTimeout(cloudTimer);
+    if (!cloud.url) return;
+    try {
+      await neonQuery('select darts_save($1::jsonb)', [JSON.stringify(db)]);
+      cloud.dirty = false;
+      cloud.last = new Date().toISOString();
+      cloudError = '';
+      saveCloud();
+      save(KEY_BACKUP, cloud.last);
+    } catch (err) {
+      cloudError = err.message;
+    }
+    if (!$('#view-settings').hidden) renderSettings();
+    return !cloudError;
+  }
+
+  function renderCloud() {
+    const when = d => new Date(d).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' });
+    let text;
+    if (!cloud.url) text = 'Keine Datenbank eingetragen – alles bleibt nur auf diesem Gerät.';
+    else if (cloudError) text = 'Hochladen fehlgeschlagen: ' + cloudError + '. Wird bei der nächsten Änderung nochmals versucht.';
+    else if (cloud.dirty) text = 'Änderungen noch nicht hochgeladen.';
+    else text = cloud.last ? 'Zuletzt hochgeladen: ' + when(cloud.last) : 'Verbunden, noch nichts hochgeladen.';
+    $('#cloud-status').textContent = text;
+    $('#cloud-status').classList.toggle('warn', !!cloudError);
+    $('#btn-cloud-push').disabled = !cloud.url;
+    $('#btn-cloud-pull').disabled = !cloud.url;
+  }
+
+  $('#btn-cloud-save').addEventListener('click', async e => {
+    const b = e.currentTarget;
+    const url = $('#cloud-url').value.trim();
+    cloud.url = url;
+    cloudError = '';
+    saveCloud();
+    if (!url) { b.textContent = 'Entfernt ✓'; renderSettings(); return; }
+    b.textContent = 'Teste …';
+    try {
+      neonEndpoint(url);
+      await neonQuery('select count(*) from darts_backup');
+      b.textContent = 'Verbunden ✓';
+    } catch (err) {
+      cloudError = err.message;
+      b.textContent = 'Speichern und testen';
+    }
+    renderSettings();
+  });
+
+  $('#btn-cloud-push').addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.textContent = 'Lade hoch …';
+    b.textContent = await cloudPush() ? 'Hochgeladen ✓' : 'Jetzt hochladen';
+  });
+
+  $('#btn-cloud-pull').addEventListener('click', e => {
+    const b = e.currentTarget;
+    twoTap(b, async () => {
+      delete b.dataset.armed;
+      b.classList.remove('danger');
+      b.textContent = 'Lade …';
+      try {
+        const rows = await neonQuery('select data, created_at from darts_backup order by id desc limit 1');
+        if (!rows.length) throw new Error('Noch nichts in der Datenbank');
+        const data = JSON.parse(rows[0].data);
+        if (!Array.isArray(data.players) || !Array.isArray(data.games)) throw new Error('Stand ungültig');
+        db = data;
+        save(KEY, db);
+        cloud.dirty = false;
+        saveCloud();
+        applySettings();
+        b.textContent = 'Geladen ✓';
+      } catch (err) {
+        cloudError = err.message;
+        b.textContent = 'Von der Datenbank laden';
+      }
+      renderSettings();
+    });
+  });
+
+  window.addEventListener('online', () => { if (cloud.dirty) cloudPush(); });
+
   // ---- Bildschirm wach halten ----
   // Das Tablet hängt an der Scheibe; der Bildschirm soll nicht ausgehen.
   // Android/Chrome gibt die Sperre frei, sobald die Seite verdeckt ist – daher neu anfordern.
@@ -760,4 +909,5 @@
   applySettings();
   show('play');
   keepAwake();
+  if (cloud.dirty) cloudPush();
 })();

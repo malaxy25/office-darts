@@ -9,7 +9,7 @@
   <title>Office Darts</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=0.1.9">
+  <link rel="stylesheet" href="style.css?v=0.1.10">
 </head>
 <body>
   <div id="banner" class="banner">Spielzeit ist keine Arbeitszeit – bitte als Pause erfassen.</div>
@@ -143,8 +143,51 @@
   <!-- Einstellungen -->
   <main id="view-settings" class="view" hidden>
     <section class="card">
+      <h2>Speicher</h2>
+      <p class="hint">Alles liegt im Speicher dieses Browsers. Wer die Browserdaten löscht, löscht auch die Resultate.</p>
+      <p id="persist-status" class="hint"></p>
+      <div class="row buttons">
+        <button id="btn-persist">Dauerhaft speichern</button>
+      </div>
+      <h3>Datenbank (Neon)</h3>
+      <p class="hint">Nach jeder Änderung wird der ganze Stand in die Datenbank geschrieben. Die Zugangsdaten bleiben nur auf diesem Gerät und kommen nicht in die Sicherungsdatei.</p>
+      <div class="row">
+        <label class="grow">Verbindung (postgresql://…)
+          <input id="cloud-url" type="password" autocomplete="off" spellcheck="false" placeholder="postgresql://darts_tablet:…@ep-….neon.tech/neondb">
+        </label>
+      </div>
+      <p id="cloud-status" class="hint"></p>
+      <div class="row buttons">
+        <button id="btn-cloud-save">Speichern und testen</button>
+        <button id="btn-cloud-push">Jetzt hochladen</button>
+        <button id="btn-cloud-pull">Von der Datenbank laden</button>
+      </div>
+      <details class="hint">
+        <summary>Datenbank einrichten (einmal, im SQL Editor von Neon)</summary>
+        <p>Das Tablet bekommt einen eigenen Zugang, der nur neue Stände anhängen und lesen darf – nichts ändern oder löschen. Die ältesten Stände (ab 200) räumt die Datenbank selbst weg.</p>
+        <pre>create table darts_backup (
+  id bigserial primary key,
+  created_at timestamptz not null default now(),
+  data jsonb not null
+);
+
+create function darts_save(d jsonb) returns void
+language sql security definer set search_path = public as $$
+  insert into darts_backup (data) values (d);
+  delete from darts_backup where id not in
+    (select id from darts_backup order by id desc limit 200);
+$$;
+
+create role darts_tablet login password 'LANGES-ZUFALLS-PASSWORT';
+revoke execute on function darts_save(jsonb) from public;
+grant execute on function darts_save(jsonb) to darts_tablet;
+grant select on darts_backup to darts_tablet;</pre>
+        <p>Dann die Verbindung von Neon kopieren und Benutzer und Passwort durch <code>darts_tablet</code> und das Passwort oben ersetzen.</p>
+      </details>
+    </section>
+    <section class="card">
       <h2>Sicherung</h2>
-      <p class="hint">Alles liegt im Speicher dieses Browsers. Ab und zu sichern – wer die Browserdaten löscht, löscht auch die Resultate.</p>
+      <p class="hint">Zusätzlich oder ohne Datenbank: ab und zu eine Datei sichern.</p>
       <p id="backup-status" class="hint"></p>
       <div class="row buttons">
         <button id="btn-export">Sicherung herunterladen</button>
@@ -189,7 +232,7 @@
         <button id="btn-clear-all">Alles löschen</button>
       </div>
     </section>
-    <p class="about">Office Darts v0.1.9 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></p>
+    <p class="about">Office Darts v0.1.10 · <a href="https://github.com/malaxy25/office-darts" target="_blank" rel="noopener">GitHub</a></p>
   </main>
 
   <!-- Regeln -->
@@ -286,7 +329,7 @@
   </main>
 
 
-  <script src="scoring.js?v=0.1.9"></script>
-  <script src="app.js?v=0.1.9"></script>
+  <script src="scoring.js?v=0.1.10"></script>
+  <script src="app.js?v=0.1.10"></script>
 </body>
 </html>
