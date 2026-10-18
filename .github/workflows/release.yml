@@ -1,0 +1,67 @@
+name: Release
+# Automatic versioning - no version number in any file.
+#
+# Every push to main runs the tests. If the app changed since the last tag (APP_PATHS), the next
+# version is derived from that tag and published as tag + GitHub Release:
+#   default            -> patch +1   (v0.1.10 -> v0.1.11)
+#   "[minor]" in a commit subject since the last tag -> minor +1, "[major]" -> major +1
+# Release notes = the commit subjects since the last tag.
+# The app footer and frehner.tech read releases/latest. Render deploys every push by itself.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create tag + release
+
+concurrency:
+  group: release    # one at a time, so two quick pushes never compute the same version
+  cancel-in-progress: false
+
+env:
+  APP_NAME: Office Darts
+  APP_PATHS: site test
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # all commits + tags
+
+      - name: Tests
+        run: node test/scoring.test.js
+
+      - name: Next version
+        id: v
+        run: |
+          set -euo pipefail
+          if [ -n "$(git tag --points-at HEAD --list 'v*')" ]; then
+            echo "HEAD is already released"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          last=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          range="${last:+$last..}HEAD"
+          if [ -n "$last" ] && git diff --quiet "$last" HEAD -- $APP_PATHS; then
+            echo "No app changes since $last"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          IFS=. read -r ma mi pa <<< "${last:-v0.0.0}"; ma=${ma#v}
+          subjects=$(git log --no-merges --format=%s "$range")
+          if grep -qi '\[major\]' <<< "$subjects"; then ma=$((ma+1)); mi=0; pa=0
+          elif grep -qi '\[minor\]' <<< "$subjects"; then mi=$((mi+1)); pa=0
+          else pa=$((pa+1)); fi
+          version="$ma.$mi.$pa"
+          printf '%s\n' "$subjects" | sed -E 's/ *\[(minor|major)\]//I; s/^/- /' > notes.md
+          echo "$last -> v$version"; cat notes.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish tag + release
+        if: steps.v.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "$APP_NAME $VERSION" --notes-file notes.md --latest

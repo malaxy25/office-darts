@@ -903,6 +903,21 @@
   document.addEventListener('visibilitychange', keepAwake);
   document.addEventListener('click', keepAwake);
 
+  // ---- Version (aus dem neuesten GitHub-Release, offline der letzte bekannte Stand) ----
+
+  const KEY_VERSION = 'officeDarts.version';
+  function showVersion(v) { if (v) $('#app-version').textContent = 'v' + v; }
+  try { showVersion(localStorage.getItem(KEY_VERSION)); } catch (e) { /* ignore */ }
+  fetch('https://api.github.com/repos/malaxy25/office-darts/releases/latest')
+    .then(r => (r.ok ? r.json() : null))
+    .then(rel => {
+      if (!rel || !rel.tag_name) return;
+      const v = rel.tag_name.replace(/^v/, '');
+      showVersion(v);
+      try { localStorage.setItem(KEY_VERSION, v); } catch (e) { /* ignore */ }
+    })
+    .catch(() => {});
+
   // ---- Start ----
 
   drawBoard();

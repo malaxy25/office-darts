@@ -30,6 +30,15 @@ Leute zusammen spielen, die sich im Arbeitsalltag sonst kaum begegnen.
 - **Vorschläge:** «Spiel doch mal gegen …» – bevorzugt Personen, mit denen man selten oder nie spielt,
   ähnlich stark ist und die in letzter Zeit aktiv waren.
 
+## Versionen
+
+Die Version steht in keiner Datei. Bei jedem Push auf `main` laufen die Tests; hat sich die App
+(`site/`, `test/`) seit dem letzten Tag geändert, erstellt `.github/workflows/release.yml` Tag und
+GitHub-Release: Patch +1, mit `[minor]` bzw. `[major]` im Commit-Betreff die entsprechende Stelle.
+Release-Notes = Commit-Betreffe (also aussagekräftig schreiben, ohne Versionsnummer). Die App zeigt
+die Version aus dem neuesten Release. Render deployt jeden Push selbst; Cache-Control `no-cache`
+ist dort als Header gesetzt, darum gibt es kein `?v=` an CSS/JS.
+
 ## Mitmachen
 
 Ideen und Rückmeldungen gerne als Issue. Der Plan mit den offenen Fragen steht in [PLAN.md](PLAN.md).
