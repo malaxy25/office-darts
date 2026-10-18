@@ -36,6 +36,7 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
 }
 
 .tabs {
+  position: relative;
   display: flex;
   gap: 4px;
   padding: 8px 16px 0;
@@ -48,9 +49,23 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
   border-radius: 0;
   color: var(--muted);
   padding: 10px 14px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 .tabs .abort { margin-left: auto; border-bottom: none; text-decoration: underline; }
+
+/* Was nicht in die Zeile passt, kommt ins Menü rechts (siehe fitTabs). */
+.more { margin-left: auto; flex-shrink: 0; }
+.abort:not([hidden]) ~ .more { margin-left: 0; }
+.more-menu {
+  position: absolute; right: 8px; top: 100%; z-index: 10; min-width: 200px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+.tabs .more-menu button { display: block; width: 100%; text-align: left; border-bottom: none; border-left: 3px solid transparent; }
+.tabs .more-menu button.active { border-left-color: var(--accent); }
+.tabs.no-brand .brand { display: none; }
 
 /* Im Spiel: Kopfzeile schmal, damit die Scheibe Platz hat. */
 body.playing .banner { padding: 3px 12px; font-size: 13px; }

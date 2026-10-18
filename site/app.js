@@ -60,8 +60,37 @@
     if (view === 'ranking') renderRanking();
     if (view === 'players') renderPlayers();
     if (view === 'settings') renderSettings();
+    fitTabs();
   }
-  $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
+  $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => { closeMore(); show(b.dataset.view); }));
+
+  // Reiter, die nicht in die Zeile passen, wandern von rechts her ins ☰-Menü.
+  function fitTabs() {
+    const nav = $('.tabs'), more = $('#more'), menu = $('#more-menu');
+    [...menu.children].forEach(b => nav.insertBefore(b, $('#btn-abort')));
+    more.hidden = true;
+    nav.classList.remove('no-brand');
+    const tabs = $$('.tabs > button[data-view]');
+    for (let i = tabs.length - 1; i > 0 && nav.scrollWidth > nav.clientWidth; i--) {
+      more.hidden = false;
+      menu.prepend(tabs[i]);
+    }
+    if (nav.scrollWidth > nav.clientWidth) nav.classList.add('no-brand');
+    $('#btn-more').classList.toggle('active', !!menu.querySelector('.active'));
+  }
+  function closeMore() {
+    $('#more-menu').hidden = true;
+    $('#btn-more').setAttribute('aria-expanded', 'false');
+  }
+  $('#btn-more').addEventListener('click', e => {
+    e.stopPropagation();
+    const open = $('#more-menu').hidden;
+    $('#more-menu').hidden = !open;
+    $('#btn-more').setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', e => { if (!$('#more').contains(e.target)) closeMore(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMore(); });
+  addEventListener('resize', fitTabs);
 
   // ---- Neues Spiel ----
 
@@ -310,7 +339,8 @@
     } else {
       b.dataset.armed = '1';
       b.textContent = 'Wirklich abbrechen? Nochmals tippen.';
-      setTimeout(() => { delete b.dataset.armed; b.textContent = 'Spiel abbrechen'; }, 4000);
+      fitTabs();
+      setTimeout(() => { delete b.dataset.armed; b.textContent = 'Spiel abbrechen'; fitTabs(); }, 4000);
     }
   });
 
@@ -664,6 +694,7 @@
   function applySettings() {
     document.title = setting('name');
     $('#brand').textContent = setting('name');
+    fitTabs();
     $('#banner').textContent = setting('banner');
     $('#banner').hidden = !setting('banner');
     $('#setup-mode').value = setting('mode');
