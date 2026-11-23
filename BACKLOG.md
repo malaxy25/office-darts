@@ -1,10 +1,10 @@
 # Backlog Office Darts
 
-## Stand (26.10.2026)
+## Stand (23.11.2026)
 
 - **Zuletzt (23.11.2026):** Turniermodus (K.-o. mit Freilos, kleiner Final, grafischer Plan). Vorher: ☰-Menü, automatische Versionierung, Neon.
-- **Nächster Schritt:** mit Andrea festlegen – nächste Phase siehe `PLAN.md` (Phase 2: Resultate und Ranglisten).
-- **Offene Fragen an Andrea:** Anmeldung für Phase 2: Microsoft 365 oder Magic Link? (`PLAN.md`)
+- **Nächster Schritt:** keiner geplant. Phase 2/3 (Konten, Anmeldung) verworfen 23.11. – erfasst wird auf dem Tablet.
+- **Offene Fragen an Andrea:** keine
 - **Voraussetzungen / Startcheck:** keiner. Push löst ein Release aus.
 
 ## Offen
