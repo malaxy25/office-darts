@@ -45,6 +45,9 @@
   const setting = k => db.settings && k in db.settings ? db.settings[k] : DEFAULTS[k];
 
   const activePlayers = () => db.players.filter(p => !p.deleted);
+  // Turnierspiele zählen nur, wenn beim Start so gewählt (sonst ranked: false).
+  const rankedGames = () => db.games.filter(g => g.ranked !== false);
+  const tourneys = () => db.tournaments || (db.tournaments = []);
   const playerName = id => (db.players.find(p => p.id === id) || { name: '?' }).name;
 
   // ---- Ansichten ----
@@ -57,12 +60,17 @@
     $('#btn-abort').hidden = id !== 'view-play';
     if (id === 'view-setup') renderSetup();
     if (id === 'view-play') renderPlay();
+    if (view === 'tourney') renderTourney();
     if (view === 'ranking') renderRanking();
     if (view === 'players') renderPlayers();
     if (view === 'settings') renderSettings();
     fitTabs();
   }
-  $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => { closeMore(); show(b.dataset.view); }));
+  $$('.tabs button[data-view]').forEach(b => b.addEventListener('click', () => {
+    closeMore();
+    if (b.dataset.view === 'tourney') tViewing = null;   // Reiter zeigt immer das aktuelle Turnier
+    show(b.dataset.view);
+  }));
 
   // Reiter, die nicht in die Zeile passen, wandern von rechts her ins ☰-Menü.
   function fitTabs() {
@@ -102,7 +110,7 @@
     $('#setup-empty').hidden = players.length > 0;
     // Wer als Erstes gewählt ist, sieht bei allen anderen, wie viele Vernetzungspunkte ein Spiel bringt.
     const month = Darts.monthOf(new Date());
-    const counts = Darts.pairCounts(db.games.filter(g => Darts.monthOf(g.date) === month));
+    const counts = Darts.pairCounts(rankedGames().filter(g => Darts.monthOf(g.date) === month));
     const me = picked[0];
     const bonus = id => Darts.meetPoints(counts[Darts.pairKey(me, id)] || 0);
     const best = Math.max(0, ...players.filter(p => !picked.includes(p.id)).map(p => bonus(p.id)));
@@ -139,7 +147,8 @@
   const isX01 = g => !g.mode || g.mode === 'x01';
   const settingsOf = g => ({ mode: g.mode || 'x01', start: g.start, doubleOut: g.doubleOut });
 
-  function startGame(players, s) {
+  // tour: { id, match } bei einem Turnierspiel, sonst leer.
+  function startGame(players, s, tour) {
     game = {
       id: uid(),
       mode: s.mode,
@@ -150,6 +159,7 @@
       current: 0,
       darts: [],
       startedAt: new Date().toISOString(),
+      tournament: tour || null,
     };
     if (s.mode === 'cricket') {
       game.marks = players.map(() => Darts.CRICKET.map(() => 0));
@@ -483,14 +493,20 @@
     };
     if (x01) entry.avg = g.players.map((_, j) => Number((g.thrown[j] ? g.scored[j] / g.thrown[j] * 3 : 0).toFixed(1)));
     if (g.mode === 'cricket') entry.points = g.points;
+    const tour = recordTourneyGame(g, winner, entry);
     db.games.push(entry);
     saveDb();
     game = null;
     saveGame();
-    $('#win-title').textContent = `${playerName(winner)} gewinnt!`;
+    $('#win-title').textContent = tour && tour.done
+      ? `${playerName(winner)} gewinnt das Turnier! 🏆`
+      : `${playerName(winner)} gewinnt!`;
     $('#win-text').textContent = `${g.thrown[i]} Pfeile` +
       (x01 ? ` · Ø ${(g.scored[i] / g.thrown[i] * 3).toFixed(1)} pro Aufnahme` : '') +
-      (g.mode === 'cricket' ? ` · ${g.points[i]} Punkte` : '');
+      (g.mode === 'cricket' ? ` · ${g.points[i]} Punkte` : '') +
+      (tour ? ` · Turnier «${tour.name}»` : '');
+    $('#win-rematch').hidden = !!tour;
+    $('#win-new').textContent = tour ? 'Zum Turnier' : 'Neues Spiel';
     $('#win').hidden = false;
     $('#win-rematch').onclick = () => {
       $('#win').hidden = true;
@@ -500,6 +516,7 @@
     $('#win-back').onclick = () => {
       $('#win').hidden = true;
       db.games = db.games.filter(x => x.id !== g.id);
+      if (tour) Darts.tourneyUndo(tour, g.tournament.match);
       saveDb();
       game = before;
       saveGame();
@@ -508,9 +525,318 @@
     $('#win-new').onclick = () => {
       $('#win').hidden = true;
       picked = [];
-      show('play');
+      tViewing = null;
+      show(tour ? 'tourney' : 'play');
     };
   }
+
+  // ---- Turnier ----
+
+  // Angezeigt wird das laufende oder das zuletzt beendete Turnier, bis jemand «Neues Turnier» tippt.
+  // Mit tViewing lässt sich jedes frühere Turnier anzeigen.
+  let tViewing = null;
+  function currentTourney() {
+    const ts = tourneys();
+    if (tViewing) {
+      const v = ts.find(x => x.id === tViewing);
+      if (v) return v;
+      tViewing = null;
+    }
+    const t = ts[ts.length - 1];
+    return t && !t.dismissed ? t : null;
+  }
+
+  const tourneyMode = t => (t.mode === 'x01' ? t.start + (t.doubleOut ? ' Double-Out' : ' Single-Out') : MODE_NAMES[t.mode]);
+
+  // Resultat pro Person für den Plan: Rest (mit Durchschnitt) bzw. Punkte bzw. erreichtes Ziel.
+  function matchScore(g, j) {
+    if (g.mode === 'cricket') return { main: g.points[j] };
+    if (g.mode === 'clock') return { main: target(g.pos[j]) };
+    return { main: g.rest[j], sub: g.thrown[j] ? 'Ø ' + (g.scored[j] / g.thrown[j] * 3).toFixed(1) : '' };
+  }
+
+  // Trägt ein beendetes Turnierspiel ein. Ergebnis: das Turnier oder null.
+  function recordTourneyGame(g, winner, entry) {
+    if (!g.tournament) return null;
+    const t = tourneys().find(x => x.id === g.tournament.id);
+    if (!t) return null;   // Turnier inzwischen abgebrochen
+    try {
+      const m = Darts.tourneyResult(t, g.tournament.match, winner, Math.random);
+      m.gameId = g.id;
+      m.score = {};
+      g.players.forEach((id, j) => { m.score[id] = matchScore(g, j); });
+    } catch (err) {
+      return null;         // z. B. inzwischen kampflos entschieden
+    }
+    entry.tournament = t.id;
+    if (!t.ranked) entry.ranked = false;
+    return t;
+  }
+
+  let tPicked = [];
+  let tSelected = null;   // angetipptes offenes Spiel
+
+  function renderTourney() {
+    const t = currentTourney();
+    $('#tourney-setup').hidden = !!t;
+    $('#tourney-run').hidden = !t;
+    if (t) renderBracket(t);
+    else renderTourneySetup();
+    renderTourneyTiles(t);
+  }
+
+  // Eine Kachel pro Turnier, neueste zuerst; das angezeigte fehlt.
+  function renderTourneyTiles(shown) {
+    const list = tourneys().filter(t => t !== shown).slice().reverse();
+    $('#tourney-list').hidden = !list.length;
+    $('#tl-tiles').innerHTML = list.map(t => {
+      const p = Darts.tourneyPodium(t);
+      const state = p
+        ? `<span class="tl-win">🏆 ${esc(playerName(p[0]))}</span>`
+        : `<span class="tl-live">läuft · ${Darts.roundName(t.rounds[t.rounds.length - 1].size)}</span>`;
+      return `<button class="tile" data-tourney="${t.id}"><b>${esc(t.name)}</b>` +
+        `<span class="hint">${new Date(t.date).toLocaleDateString('de-CH')} · ${esc(tourneyMode(t))} · ${t.players.length} Personen</span>` +
+        state + '</button>';
+    }).join('');
+  }
+
+  $('#tl-tiles').addEventListener('click', e => {
+    const b = e.target.closest('[data-tourney]');
+    if (!b) return;
+    openTourney(b.dataset.tourney);
+  });
+
+  function openTourney(id) {
+    const ts = tourneys();
+    const last = ts[ts.length - 1];
+    // Das laufende Turnier ist ohnehin die Standardansicht.
+    tViewing = last && last.id === id && !last.dismissed ? null : id;
+    tSelected = null;
+    show('tourney');
+    window.scrollTo(0, 0);
+  }
+
+  const defaultTourneyName = () => 'Turnier ' + new Date().toLocaleDateString('de-CH');
+
+  function renderTourneySetup() {
+    const players = activePlayers();
+    tPicked = tPicked.filter(id => players.some(p => p.id === id));
+    $('#ts-players').innerHTML = players.map(p =>
+      `<button data-id="${p.id}" class="${tPicked.indexOf(p.id) >= 0 ? 'on' : ''}">${esc(p.name)}</button>`).join('') ||
+      '<p class="hint">Noch niemand erfasst – unter «Spielende» Namen hinzufügen.</p>';
+    const n = tPicked.length;
+    $('#ts-hint').textContent = n < 3
+      ? 'Wer macht mit? Antippen (mindestens 3).'
+      : `${n} dabei · Start im ${Darts.roundName(n)}: ${Math.floor(n / 2)} Spiele` +
+        (n % 2 ? ' und 1 Freilos' : '') + ` · insgesamt ${Darts.tourneyGames(n)} Spiele`;
+    $('#ts-name').placeholder = defaultTourneyName();
+    $('#ts-out-label').hidden = !!MODE_NAMES[$('#ts-mode').value];
+    $('#ts-start').disabled = n < 3;
+  }
+
+  $('#ts-players').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const id = b.dataset.id;
+    tPicked = tPicked.indexOf(id) >= 0 ? tPicked.filter(x => x !== id) : tPicked.concat([id]);
+    renderTourneySetup();
+  });
+  $('#ts-mode').addEventListener('change', renderTourneySetup);
+
+  $('#ts-start').addEventListener('click', () => {
+    const v = $('#ts-mode').value;
+    const x01 = !MODE_NAMES[v];
+    const t = {
+      id: uid(),
+      name: $('#ts-name').value.trim() || defaultTourneyName(),
+      date: new Date().toISOString(),
+      mode: x01 ? 'x01' : v,
+      start: x01 ? Number(v) : 0,
+      doubleOut: x01 && $('#ts-out').value === 'double',
+      ranked: $('#ts-ranked').checked,
+    };
+    Darts.tourneyStart(t, tPicked.slice(), Math.random);
+    tourneys().push(t);
+    tPicked = [];
+    tSelected = null;
+    $('#ts-name').value = '';
+    $('#ts-ranked').checked = false;
+    saveDb();
+    renderTourney();
+  });
+
+  const runningMatch = t => (game && game.tournament && game.tournament.id === t.id ? game.tournament.match : null);
+
+  function sideHtml(m, id) {
+    const s = m.score && m.score[id];
+    const cls = !m.winner ? '' : m.winner === id ? 'win' : 'lose';
+    let sc = '';
+    if (s) sc = esc(s.main) + (s.sub ? `<small>${esc(s.sub)}</small>` : '');
+    else if (m.walkover) sc = m.winner === id ? 'weiter' : 'w.o.';
+    return `<div class="side ${cls}"><span class="who">${esc(playerName(id))}</span><span class="sc">${sc}</span></div>`;
+  }
+
+  function matchHtml(t, m, live) {
+    const open = live && !m.winner;
+    const running = runningMatch(t) === m.id;
+    const cls = ['match', m.winner ? 'done' : open ? 'open' : '', running ? 'running' : '',
+      m.id === tSelected ? 'selected' : ''].join(' ');
+    const label = m.kind === 'third' ? 'Platz 3' : m.kind === 'final' ? 'Final' : '';
+    const note = running ? 'läuft' : m.walkover ? 'kampflos' : open ? 'antippen' : '';
+    const inner = (label ? `<div class="mlabel">${label}</div>` : '') + sideHtml(m, m.a) + sideHtml(m, m.b) +
+      (note ? `<div class="mnote">${note}</div>` : '');
+    return open
+      ? `<button class="${cls}" data-match="${m.id}">${inner}</button>`
+      : `<div class="${cls}">${inner}</div>`;
+  }
+
+  const emptyMatch = label => `<div class="match empty">${label ? `<div class="mlabel">${label}</div>` : ''}` +
+    '<div class="side">?</div><div class="side">?</div></div>';
+
+  function renderBracket(t) {
+    const last = t.rounds[t.rounds.length - 1];
+    const podium = Darts.tourneyPodium(t);
+    $('#tr-title').textContent = t.name;
+    $('#tr-info').textContent = `${tourneyMode(t)} · ${t.players.length} Personen · ` +
+      (t.ranked ? 'zählt für die Ranglisten' : 'zählt nicht für die Ranglisten');
+
+    // Wo wir stehen
+    const all = t.rounds.reduce((a, r) => a.concat(r.matches), []);
+    const played = all.filter(m => m.winner).length;
+    const total = Darts.tourneyGames(t.players.length);
+    const runId = runningMatch(t);
+    const run = runId && Darts.findMatch(t, runId);
+    let status;
+    if (t.done) status = `Beendet · ${total} Spiele`;
+    else {
+      const open = last.matches.filter(m => !m.winner).length;
+      status = `Jetzt: ${Darts.roundName(last.size)} · noch ${open} ${open === 1 ? 'Spiel' : 'Spiele'} in dieser Runde · ` +
+        `${played} von ${total} gespielt` +
+        (run ? ` · läuft: ${playerName(run.a)} – ${playerName(run.b)}` : ' · offenes Spiel antippen');
+    }
+    $('#tr-status').textContent = status;
+    $('#tr-status').style.setProperty('--done', Math.round(played / total * 100) + '%');
+
+    $('#tr-podium').hidden = !podium;
+    if (podium) {
+      $('#tr-podium').innerHTML = podium.map((id, i) =>
+        `<div class="p${i + 1}"><span>${['🏆 1.', '🥈 2.', '🥉 3.', '4.'][i]}</span><b>${esc(playerName(id))}</b></div>`).join('');
+    }
+
+    // Plan: ausgeloste Runden, danach die noch offenen als Platzhalter
+    let html = t.rounds.map((r, i) => {
+      const live = !t.done && i === t.rounds.length - 1;
+      const name = r.matches.length > 1 && r.size === 2 ? 'Finals' : Darts.roundName(r.size);
+      return `<div class="round ${live ? 'live' : ''}"><h3>${name}` +
+        (live ? '<span class="now">jetzt</span>' : '') + '</h3><div class="matches">' +
+        r.matches.map(m => matchHtml(t, m, live)).join('') +
+        (r.bye ? `<div class="match bye"><div class="side win"><span class="who">${esc(playerName(r.bye))}</span>` +
+          '<span class="sc">Freilos</span></div></div>' : '') +
+        '</div></div>';
+    }).join('');
+    let prev = last.size;
+    Darts.tourneyAhead(t).forEach(size => {
+      let ms = '';
+      if (size === 2) ms = (prev === 4 ? emptyMatch('Platz 3') : '') + emptyMatch('Final');
+      else {
+        for (let k = 0; k < Math.floor(size / 2); k++) ms += emptyMatch('');
+        if (size % 2) ms += '<div class="match empty bye"><div class="side"><span class="who">?</span><span class="sc">Freilos</span></div></div>';
+      }
+      html += `<div class="round ahead"><h3>${size === 2 && prev === 4 ? 'Finals' : Darts.roundName(size)}</h3><div class="matches">${ms}</div></div>`;
+      prev = size;
+    });
+    $('#tr-bracket').innerHTML = html;
+
+    // Angetipptes Spiel: starten oder kampflos
+    const m = tSelected && !t.done ? Darts.findMatch(t, tSelected) : null;
+    const act = $('#tr-action');
+    act.hidden = !m || !!m.winner;
+    if (!act.hidden) {
+      const a = esc(playerName(m.a)), b = esc(playerName(m.b));
+      act.innerHTML = `<p><b>${a}</b> gegen <b>${b}</b> · ${esc(tourneyMode(t))} · wer beginnt, wird ausgelost</p>` +
+        (game
+          ? '<p class="hint warn">Es läuft schon ein Spiel – zuerst beenden oder abbrechen.</p>' +
+            '<div class="row buttons"><button id="tr-goto" class="primary">Zum laufenden Spiel</button></div>'
+          : '<div class="row buttons"><button id="tr-play" class="primary">Spiel starten</button></div>') +
+        `<div class="row buttons"><button data-wo="${m.a}">${a} kampflos weiter</button>` +
+        `<button data-wo="${m.b}">${b} kampflos weiter</button></div>` +
+        '<p class="hint">Kampflos nur, wenn jemand nicht antreten kann. Zweimal tippen.</p>';
+    }
+
+    $('#tr-back').hidden = !tViewing;
+    $('#tr-new').hidden = !t.done || !!tViewing;
+    $('#tr-abort').hidden = t.done;
+  }
+
+  $('#tourney-run').addEventListener('click', e => {
+    const t = currentTourney();
+    if (!t) return;
+    const mb = e.target.closest('[data-match]');
+    if (mb) {
+      tSelected = tSelected === mb.dataset.match ? null : mb.dataset.match;
+      renderBracket(t);
+      return;
+    }
+    const m = tSelected ? Darts.findMatch(t, tSelected) : null;
+    if (e.target.closest('#tr-play') && m && !game) {
+      tSelected = null;
+      const order = Math.random() < 0.5 ? [m.a, m.b] : [m.b, m.a];
+      startGame(order, settingsOf(t), { id: t.id, match: m.id });
+      return;
+    }
+    if (e.target.closest('#tr-goto')) { show('play'); return; }
+    const wo = e.target.closest('[data-wo]');
+    if (wo && m) {
+      twoTap(wo, () => {
+        const done = Darts.tourneyResult(t, m.id, wo.dataset.wo, Math.random);
+        done.walkover = true;
+        tSelected = null;
+        saveDb();
+        renderBracket(t);
+      });
+      return;
+    }
+    if (e.target.closest('#tr-back')) {
+      tViewing = null;
+      renderTourney();
+      return;
+    }
+    if (e.target.closest('#tr-new')) {
+      t.dismissed = true;
+      saveDb();
+      renderTourney();
+      return;
+    }
+    const ab = e.target.closest('#tr-abort');
+    if (ab) {
+      twoTap(ab, () => {
+        // Gespielte Spiele bleiben; ein laufendes Spiel wird zum normalen Spiel.
+        db.tournaments = tourneys().filter(x => x.id !== t.id);
+        tViewing = null;
+        if (game && game.tournament && game.tournament.id === t.id) { game.tournament = null; saveGame(); }
+        tSelected = null;
+        saveDb();
+        renderTourney();
+      });
+    }
+  });
+
+  function renderTourneyHistory() {
+    const done = tourneys().filter(t => t.done).slice().reverse();
+    const day = d => new Date(d).toLocaleDateString('de-CH');
+    $('#table-tourneys').innerHTML = done.length
+      ? '<tr><th>Turnier</th><th>Datum</th><th>Sieg</th><th>2.</th><th>3.</th></tr>' +
+        done.map(t => {
+          const p = Darts.tourneyPodium(t);
+          const n = i => (p[i] ? esc(playerName(p[i])) : '–');
+          return `<tr class="link-row" data-tourney="${t.id}"><td>${esc(t.name)}</td><td>${day(t.date)}</td><td><b>${n(0)}</b></td><td>${n(1)}</td><td>${n(2)}</td></tr>`;
+        }).join('')
+      : '<tr><td class="hint">Noch kein Turnier beendet.</td></tr>';
+  }
+  $('#table-tourneys').addEventListener('click', e => {
+    const r = e.target.closest('[data-tourney]');
+    if (r) openTourney(r.dataset.tourney);
+  });
 
   // ---- Rangliste ----
 
@@ -530,7 +856,7 @@
   // Zeiträume, in denen gespielt wurde, neueste zuerst.
   function periodsWithGames(kind) {
     const keys = [];
-    db.games.forEach(g => {
+    rankedGames().forEach(g => {
       const k = Darts.periodOf(g.date, kind);
       if (keys.indexOf(k) < 0) keys.push(k);
     });
@@ -580,10 +906,11 @@
       sel.innerHTML = keys.map(k => `<option value="${k}">${Darts.periodLabel(rankKind, k)}</option>`).join('');
       sel.value = String(rankKey);
     }
-    const sorted = db.games.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = rankedGames().sort((a, b) => a.date.localeCompare(b.date));
     const games = rankKind === 'all' ? sorted : sorted.filter(g => Darts.periodOf(g.date, rankKind) === rankKey);
     const players = activePlayers();
     renderHonors(sorted);
+    renderTourneyHistory();
 
     const elo = Darts.eloRatings(games);
     const eloRows = players.filter(p => elo.played[p.id])
@@ -700,6 +1027,7 @@
     $('#setup-mode').value = setting('mode');
     $('#setup-out').value = setting('out');
     $('#setup-out-label').hidden = setupMode() !== 'x01';
+    $('#ts-out').value = setting('out');
   }
 
   function renderSettings() {
@@ -729,6 +1057,7 @@
 
   function clearData(all) {
     db.games = [];
+    db.tournaments = [];
     if (all) db.players = [];
     saveDb();
     game = null;

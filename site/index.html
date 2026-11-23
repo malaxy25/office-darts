@@ -17,6 +17,7 @@
   <nav class="tabs">
     <span id="brand" class="brand">Office Darts</span>
     <button data-view="play" class="active">Spielen</button>
+    <button data-view="tourney">Turnier</button>
     <button data-view="ranking">Rangliste</button>
     <button data-view="players">Spielende</button>
     <button data-view="rules">Regeln</button>
@@ -94,6 +95,58 @@
     </div>
   </div>
 
+  <!-- Turnier -->
+  <main id="view-tourney" class="view" hidden>
+    <section id="tourney-setup" class="card">
+      <h2>Neues Turnier</h2>
+      <p class="hint">K.-o.: Wer verliert, scheidet aus. Jede Runde wird neu ausgelost. Bei ungerader Zahl hat jemand
+        ein Freilos – niemand zweimal, solange es geht. Am Schluss: kleiner Final um Platz 3 und Final.</p>
+      <p id="ts-hint" class="hint"></p>
+      <div id="ts-players" class="chips"></div>
+      <div class="row">
+        <label class="grow">Name des Turniers
+          <input id="ts-name" maxlength="40" autocomplete="off">
+        </label>
+      </div>
+      <div class="row">
+        <label>Spiel
+          <select id="ts-mode">
+            <option value="501">501</option>
+            <option value="301" selected>301</option>
+            <option value="cricket">Cricket</option>
+            <option value="clock">Around the Clock</option>
+          </select>
+        </label>
+        <label id="ts-out-label">Finish
+          <select id="ts-out">
+            <option value="double">Double-Out</option>
+            <option value="single" selected>Single-Out (Einsteigende)</option>
+          </select>
+        </label>
+        <label class="check"><input id="ts-ranked" type="checkbox"> Spiele zählen für die Ranglisten</label>
+      </div>
+      <button id="ts-start" class="primary big" disabled>Turnier starten</button>
+    </section>
+    <section id="tourney-run" class="card" hidden>
+      <h2 id="tr-title"></h2>
+      <p id="tr-info" class="hint"></p>
+      <p id="tr-status" class="tr-status"></p>
+      <div id="tr-podium" class="podium" hidden></div>
+      <div id="tr-action" class="tr-action" hidden></div>
+      <div id="tr-bracket" class="bracket"></div>
+      <div class="row buttons">
+        <button id="tr-back" hidden>Zurück</button>
+        <button id="tr-new" class="primary" hidden>Neues Turnier</button>
+        <button id="tr-abort" class="link">Turnier abbrechen</button>
+      </div>
+    </section>
+    <section id="tourney-list" class="card" hidden>
+      <h2>Alle Turniere</h2>
+      <p class="hint">Antippen, um den Plan anzusehen.</p>
+      <div id="tl-tiles" class="tiles"></div>
+    </section>
+  </main>
+
   <!-- Rangliste -->
   <main id="view-ranking" class="view" hidden>
     <div class="row rank-filter">
@@ -123,6 +176,10 @@
       <h2>Ehrentafel</h2>
       <p class="hint">Die Besten jedes abgeschlossenen Monats, Quartals und Jahres.</p>
       <table id="table-honors"></table>
+    </section>
+    <section class="card">
+      <h2>Turniere</h2>
+      <table id="table-tourneys"></table>
     </section>
     <section class="card">
       <h2>Mit wem noch nie?</h2>
@@ -232,7 +289,7 @@ grant select on darts_backup to darts_tablet;</pre>
       <h2>Neu beginnen</h2>
       <p class="hint">Vorher sichern! Gelöscht ist gelöscht. Zweimal tippen zum Bestätigen.</p>
       <div class="row buttons">
-        <button id="btn-clear-games">Alle Spiele löschen (Spielende bleiben)</button>
+        <button id="btn-clear-games">Alle Spiele und Turniere löschen (Spielende bleiben)</button>
         <button id="btn-clear-all">Alles löschen</button>
       </div>
     </section>
@@ -317,6 +374,19 @@ grant select on darts_backup to darts_tablet;</pre>
         <li>Wer zuerst das Bull trifft, gewinnt. Ideal zum Einsteigen und Einwerfen.</li>
       </ul>
       <p class="hint">Auf dem Tablet ist das nächste Ziel hell, alles andere abgedunkelt.</p>
+    </section>
+    <section class="card">
+      <h2>Turnier</h2>
+      <ul>
+        <li><b>K.-o.:</b> Wer ein Spiel verliert, scheidet aus. Jede Runde wird neu ausgelost.</li>
+        <li><b>Freilos:</b> Bei ungerader Zahl kommt jemand ohne Spiel weiter – per Los, und niemand zweimal,
+          solange es anders geht.</li>
+        <li><b>Wer beginnt,</b> wird bei jedem Spiel ausgelost.</li>
+        <li><b>Am Schluss:</b> Die beiden aus dem Halbfinal, die verloren haben, spielen den kleinen Final um
+          Platz 3, die beiden anderen den Final.</li>
+        <li><b>Kampflos:</b> Kann jemand nicht antreten, kommt das Gegenüber kampflos weiter.</li>
+        <li>Turnierspiele zählen nur für die Ranglisten, wenn das beim Start so gewählt wurde.</li>
+      </ul>
     </section>
     <section class="card">
       <h2>Ranglisten</h2>

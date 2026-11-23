@@ -249,11 +249,138 @@
     return { points, opponents };
   }
 
+  // ---- Turnier (K.-o.) ----
+  // Jede Runde wird neu ausgelost. Bei ungerader Zahl hat jemand ein Freilos – wer noch keines hatte,
+  // kommt zuerst dran. Wer verliert, scheidet aus. Aus einem Halbfinal mit vier Personen gibt es den
+  // kleinen Final (Platz 3) und den Final. Runde: { size, bye, matches: [{ id, kind?, a, b, winner }] }.
+  // rnd: Zufallsfunktion wie Math.random (in den Tests fest, damit sie wiederholbar sind).
+
+  function shuffle(list, rnd) {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // Name einer Runde nach der Anzahl Personen, die darin noch dabei sind.
+  function roundName(size) {
+    if (size <= 2) return 'Final';
+    if (size <= 4) return 'Halbfinal';
+    if (size <= 8) return 'Viertelfinal';
+    if (size <= 16) return 'Achtelfinal';
+    if (size <= 32) return 'Sechzehntelfinal';
+    return 'Runde mit ' + size;
+  }
+
+  // Grösse aller Runden bei n Teilnehmenden, z. B. 5 → [5, 3, 2].
+  function roundSizes(n) {
+    const sizes = [n];
+    while (n > 2) { n = Math.ceil(n / 2); sizes.push(n); }
+    return sizes;
+  }
+
+  // Anzahl Spiele: alle ausser der Siegerin oder dem Sieger scheiden einmal aus, dazu der kleine Final.
+  function tourneyGames(n) {
+    return n - 1 + (roundSizes(n).indexOf(4) >= 0 ? 1 : 0);
+  }
+
+  const loserOf = m => (m.winner === m.a ? m.b : m.a);
+  const roundDone = r => r.matches.every(m => m.winner);
+  const advancing = r => r.matches.map(m => m.winner).concat(r.bye ? [r.bye] : []);
+
+  function drawRound(t, players, rnd) {
+    const ri = t.rounds.length;
+    const round = { size: players.length, bye: null, matches: [] };
+    if (players.length === 2) {
+      const prev = t.rounds[ri - 1];
+      if (prev && prev.size === 4) {
+        const losers = prev.matches.map(loserOf);
+        round.matches.push({ id: ri + '-third', kind: 'third', a: losers[0], b: losers[1], winner: null });
+      }
+      round.matches.push({ id: ri + '-final', kind: 'final', a: players[0], b: players[1], winner: null });
+    } else {
+      let rest = shuffle(players, rnd);
+      if (rest.length % 2) {
+        const byes = id => t.rounds.filter(r => r.bye === id).length;
+        const min = Math.min.apply(null, rest.map(byes));
+        round.bye = rest.filter(id => byes(id) === min)[0];   // rest ist schon gemischt → zufällig
+        rest = rest.filter(id => id !== round.bye);
+      }
+      for (let i = 0; i < rest.length; i += 2) {
+        round.matches.push({ id: ri + '-' + i / 2, a: rest[i], b: rest[i + 1], winner: null });
+      }
+    }
+    t.rounds.push(round);
+  }
+
+  function tourneyStart(t, players, rnd) {
+    if (players.length < 2) throw new Error('Mindestens zwei Personen');
+    t.players = players.slice();
+    t.rounds = [];
+    t.done = false;
+    drawRound(t, t.players, rnd);
+    return t;
+  }
+
+  function findMatch(t, id) {
+    for (const r of t.rounds) for (const m of r.matches) if (m.id === id) return m;
+    return null;
+  }
+
+  // Trägt den Sieg ein; ist die Runde damit fertig, wird die nächste ausgelost.
+  function tourneyResult(t, matchId, winner, rnd) {
+    const m = findMatch(t, matchId);
+    if (!m || m.winner || (winner !== m.a && winner !== m.b)) throw new Error('Spiel nicht offen');
+    m.winner = winner;
+    const last = t.rounds[t.rounds.length - 1];
+    if (roundDone(last)) {
+      if (last.size === 2) t.done = true;
+      else drawRound(t, advancing(last), rnd);
+    }
+    return m;
+  }
+
+  // Nimmt einen Sieg zurück (falsch erfasst). Danach ausgeloste Runden fallen weg.
+  function tourneyUndo(t, matchId) {
+    const ri = t.rounds.findIndex(r => r.matches.some(m => m.id === matchId));
+    if (ri < 0) return;
+    t.rounds.length = ri + 1;
+    const m = findMatch(t, matchId);
+    Object.keys(m).forEach(k => { if (['id', 'kind', 'a', 'b'].indexOf(k) < 0) delete m[k]; });
+    m.winner = null;
+    t.done = false;
+  }
+
+  // Rangfolge am Schluss: [1., 2., 3., 4.] – Platz 4 nur mit kleinem Final. Vorher null.
+  function tourneyPodium(t) {
+    if (!t.done) return null;
+    const fin = t.rounds[t.rounds.length - 1].matches;
+    const final = fin.find(m => m.kind === 'final');
+    const third = fin.find(m => m.kind === 'third');
+    const podium = [final.winner, loserOf(final)];
+    if (third) podium.push(third.winner, loserOf(third));
+    else {
+      const prev = t.rounds[t.rounds.length - 2];
+      if (prev && prev.size === 3) podium.push(loserOf(prev.matches[0]));
+    }
+    return podium;
+  }
+
+  // Runden, die noch nicht ausgelost sind (nur ihre Grösse).
+  function tourneyAhead(t) {
+    if (t.done) return [];
+    return roundSizes(t.rounds[t.rounds.length - 1].size).slice(1);
+  }
+
   const api = {
     SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
     CRICKET, applyCricket, CLOCK, applyClock,
     ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey, monthOf,
     periodOf, periodLabel, periodEnd,
+    roundName, roundSizes, tourneyGames, tourneyStart, tourneyResult, tourneyUndo, tourneyPodium,
+    tourneyAhead, findMatch,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Darts = api;

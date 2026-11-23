@@ -131,3 +131,85 @@ assert.strictEqual(D.periodEnd('year', 2026).getTime(), new Date(2027, 0, 1).get
 assert.ok(D.periodOf(new Date(2026, 11, 31), 'month') < D.periodOf(new Date(2027, 0, 1), 'month'));
 
 console.log('Zeitraum-Tests bestanden.');
+
+// Turnier (K.-o.)
+function seeded(seed) {
+  let s = seed;
+  return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+}
+// Spielt ein Turnier durch; gewinnen tut immer die Person mit dem kleineren Namen.
+function playOut(names, seed) {
+  const rnd = seeded(seed);
+  const t = D.tourneyStart({}, names, rnd);
+  let guard = 0;
+  while (!t.done && guard++ < 100) {
+    const r = t.rounds[t.rounds.length - 1];
+    const m = r.matches.find(x => !x.winner);
+    D.tourneyResult(t, m.id, m.a < m.b ? m.a : m.b, rnd);
+  }
+  return t;
+}
+const names = n => Array.from({ length: n }, (_, i) => 'p' + String(i).padStart(2, '0'));
+
+assert.deepStrictEqual(D.roundSizes(5), [5, 3, 2]);
+assert.deepStrictEqual(D.roundSizes(16), [16, 8, 4, 2]);
+assert.deepStrictEqual(D.roundSizes(11), [11, 6, 3, 2]);
+assert.strictEqual(D.roundName(16), 'Achtelfinal');
+assert.strictEqual(D.roundName(7), 'Viertelfinal');
+assert.strictEqual(D.roundName(3), 'Halbfinal');
+assert.strictEqual(D.roundName(2), 'Final');
+assert.strictEqual(D.tourneyGames(5), 4);    // ohne kleinen Final (Halbfinal zu dritt)
+assert.strictEqual(D.tourneyGames(8), 8);    // 7 + kleiner Final
+
+for (let n = 2; n <= 33; n++) {
+  for (let seed = 1; seed <= 20; seed++) {
+    const t = playOut(names(n), seed);
+    assert.ok(t.done);
+    assert.deepStrictEqual(t.rounds.map(r => r.size), D.roundSizes(n));
+    const all = t.rounds.reduce((a, r) => a.concat(r.matches), []);
+    assert.strictEqual(all.length, D.tourneyGames(n));
+    // Freilos bekommt immer jemand mit den wenigsten bisherigen Freilosen – zweimal nur, wenn alle
+    // in der Runde schon eines hatten.
+    t.rounds.forEach((r, i) => {
+      if (!r.bye) return;
+      const before = id => t.rounds.slice(0, i).filter(x => x.bye === id).length;
+      const ids = r.matches.reduce((a, m) => a.concat([m.a, m.b]), []);
+      ids.forEach(id => assert.ok(before(r.bye) <= before(id), `n=${n} seed=${seed}`));
+    });
+    if (n <= 12) {
+      const byes = t.rounds.map(r => r.bye).filter(Boolean);
+      assert.strictEqual(new Set(byes).size, byes.length);
+    }
+    // In jeder Runde spielt jede Person genau einmal oder hat das Freilos.
+    t.rounds.forEach(r => {
+      const ids = r.matches.filter(m => m.kind !== 'third')
+        .reduce((a, m) => a.concat([m.a, m.b]), r.bye ? [r.bye] : []);
+      assert.strictEqual(new Set(ids).size, r.size);
+    });
+    const podium = D.tourneyPodium(t);
+    assert.strictEqual(podium[0], 'p00');
+    assert.strictEqual(new Set(podium).size, podium.length);
+    if (D.roundSizes(n).indexOf(4) >= 0) assert.strictEqual(podium.length, 4);
+  }
+}
+
+// Kleiner Final: die beiden Verlierenden des Halbfinals
+let t4 = playOut(['a', 'b', 'c', 'd'], 3);
+const fin = t4.rounds[1].matches;
+assert.deepStrictEqual(fin.map(m => m.kind), ['third', 'final']);
+assert.deepStrictEqual([fin[0].a, fin[0].b].sort(), t4.rounds[0].matches.map(m => (m.winner === m.a ? m.b : m.a)).sort());
+
+// Rückgängig: der Sieg fällt weg, die danach ausgeloste Runde auch
+const rnd = seeded(7);
+const tu = D.tourneyStart({}, ['a', 'b', 'c', 'd'], rnd);
+const [m1, m2] = tu.rounds[0].matches;
+D.tourneyResult(tu, m1.id, m1.a, rnd);
+D.tourneyResult(tu, m2.id, m2.b, rnd);
+assert.strictEqual(tu.rounds.length, 2);
+D.tourneyUndo(tu, m2.id);
+assert.strictEqual(tu.rounds.length, 1);
+assert.strictEqual(m2.winner, null);
+assert.throws(() => D.tourneyResult(tu, m1.id, m1.b, rnd));   // schon entschieden
+assert.deepStrictEqual(D.tourneyAhead(tu), [2]);
+
+console.log('Turnier-Tests bestanden.');

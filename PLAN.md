@@ -35,6 +35,11 @@ von selbst – kein Login, keine Bestätigung nötig (das Gegenüber steht ja da
   letzten 200 Stände bleiben). Zugang nur auf dem Tablet eingetragen, nicht im Code.
 - Reine statische Seite → gratis als Render Static Site, schläft nie.
 
+- **Turnier (K.-o.):** Teilnehmende aus der Liste wählen, Name, Spielart (Standard 301), Schalter «zählt für
+  die Ranglisten» (Standard aus). Jede Runde neu ausgelost, bei ungerader Zahl ein Freilos (wer am wenigsten
+  hatte), Anwurf ausgelost, kleiner Final um Platz 3 und Final, kampflos weiter möglich. Plan als Spalten
+  pro Runde mit Resultaten (Rest und Ø bzw. Punkte), Podest am Schluss, Kacheln aller Turniere (Plan wieder ansehen), Turnierliste in der Rangliste.
+
 Später möglich: Ranglisten aus Neon auch am Handy anzeigen.
 
 ## Phase 2 – Resultate und Ranglisten
