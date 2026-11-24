@@ -374,13 +374,102 @@
     return roundSizes(t.rounds[t.rounds.length - 1].size).slice(1);
   }
 
+  // ---- Geladene Daten prüfen (Sicherungsdatei, Datenbank) ----
+  // Was nicht von dieser App stammen kann, wird abgelehnt – so kommt über eine präparierte Datei kein Code
+  // in die Seite (IDs landen in HTML-Attributen) und keine unsinnig grossen Texte in die Ansicht.
+
+  const ID = /^[A-Za-z0-9-]{1,40}$/;
+  const KEY_NAME = /^[A-Za-z0-9_-]{1,40}$/;
+  const ID_KEYS = ['id', 'a', 'b', 'winner', 'bye', 'tournament', 'gameId'];
+  const MAX_TEXT = 200;
+  const TEXT_LIMITS = { name: 40, banner: 120 };
+
+  function cleanData(data) {
+    const fail = what => { throw new Error('Datei ungültig: ' + what); };
+    if (!data || typeof data !== 'object' || !Array.isArray(data.players) || !Array.isArray(data.games)) {
+      fail('Spielende oder Spiele fehlen');
+    }
+    if (JSON.stringify(data).length > 2000000) fail('zu gross');
+    (function walk(v, key, depth) {
+      if (depth > 12) fail('zu tief verschachtelt');
+      if (v === null || typeof v === 'boolean') return;
+      if (typeof v === 'number') { if (!isFinite(v)) fail('Zahl'); return; }
+      if (typeof v === 'string') {
+        if (ID_KEYS.indexOf(key) >= 0 && !ID.test(v)) fail('ID');
+        if (v.length > MAX_TEXT) fail('Text zu lang');
+        return;
+      }
+      if (Array.isArray(v)) { v.forEach(x => walk(x, key === 'players' ? 'id' : key, depth + 1)); return; }
+      if (typeof v !== 'object') fail('Wert');
+      Object.keys(v).forEach(k => {
+        if (!KEY_NAME.test(k) || k === '__proto__' || k === 'constructor' || k === 'prototype') fail('Feldname');
+        walk(v[k], k, depth + 1);
+      });
+    })(data, '', 0);
+
+    const known = new Set();
+    data.players.forEach(p => {
+      if (!p || !ID.test(p.id) || typeof p.name !== 'string' || !p.name.trim() || p.name.length > TEXT_LIMITS.name) fail('Spielende');
+      known.add(p.id);
+    });
+    const people = (list, min, max) => Array.isArray(list) && list.length >= min && list.length <= max &&
+      list.every(id => known.has(id));
+    const validDate = d => typeof d === 'string' && !isNaN(Date.parse(d));
+    data.games.forEach(g => {
+      if (!g || !ID.test(g.id) || !validDate(g.date) || !people(g.players, 2, 4) || g.players.indexOf(g.winner) < 0 ||
+          typeof g.mode !== 'string' || g.mode.length > 20) fail('Spiel');
+    });
+    if (data.settings !== undefined) {
+      const s = data.settings;
+      if (!s || typeof s !== 'object' || Array.isArray(s)) fail('Einstellungen');
+      Object.keys(TEXT_LIMITS).forEach(k => {
+        if (s[k] !== undefined && (typeof s[k] !== 'string' || s[k].length > TEXT_LIMITS[k])) fail('Einstellungen');
+      });
+    }
+    if (data.tournaments !== undefined) {
+      if (!Array.isArray(data.tournaments)) fail('Turniere');
+      data.tournaments.forEach(t => {
+        if (!t || !ID.test(t.id) || typeof t.name !== 'string' || t.name.length > 40 || !validDate(t.date) ||
+            ['x01', 'cricket', 'clock'].indexOf(t.mode) < 0 || !people(t.players, 2, 64) || !Array.isArray(t.rounds)) fail('Turnier');
+        t.rounds.forEach(r => {
+          if (!r || !Array.isArray(r.matches) || (r.bye != null && !known.has(r.bye))) fail('Turnier');
+          r.matches.forEach(m => {
+            if (!m || !known.has(m.a) || !known.has(m.b) || (m.winner != null && m.winner !== m.a && m.winner !== m.b)) fail('Turnier');
+          });
+        });
+      });
+    }
+    return data;
+  }
+
+  // ---- Plausibilität eines Spiels (nur Hinweis, entscheiden muss ein Mensch) ----
+
+  // Weniger Pfeile kann niemand brauchen: höchstens 60 Punkte pro Pfeil (501 → 9, 301 → 6).
+  const minDarts = start => Math.max(1, Math.ceil(start / 60));
+  const MIN_SECONDS_PER_DART = 2;   // werfen, Pfeile holen, antippen – schneller geht es nur beim Erfinden
+
+  // Gründe, warum ein erfasstes Spiel auffällt – leer, wenn nichts auffällt.
+  function suspicious(g) {
+    const why = [];
+    const i = g.players.indexOf(g.winner);
+    const start = parseInt(g.mode, 10);
+    if (start > 0 && Array.isArray(g.darts) && g.darts[i] < minDarts(start)) {
+      why.push(`${g.darts[i]} Pfeile für ${start} sind unmöglich`);
+    }
+    const total = Array.isArray(g.darts) ? g.darts.reduce((s, n) => s + n, 0) : 0;
+    if (typeof g.secs === 'number' && total && g.secs < total * MIN_SECONDS_PER_DART) {
+      why.push(`${total} Pfeile in ${g.secs} Sekunden erfasst`);
+    }
+    return why;
+  }
+
   const api = {
     SEGMENTS, RINGS, MISS, hit, hitAt, positionFor, applyTurn, checkoutHint,
     CRICKET, applyCricket, CLOCK, applyClock,
     ELO_START, eloRatings, meetPoints, networkPoints, pairCounts, pairKey, monthOf,
     periodOf, periodLabel, periodEnd,
     roundName, roundSizes, tourneyGames, tourneyStart, tourneyResult, tourneyUndo, tourneyPodium,
-    tourneyAhead, findMatch,
+    tourneyAhead, findMatch, cleanData, minDarts, suspicious,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Darts = api;

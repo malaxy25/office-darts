@@ -213,3 +213,44 @@ assert.throws(() => D.tourneyResult(tu, m1.id, m1.b, rnd));   // schon entschied
 assert.deepStrictEqual(D.tourneyAhead(tu), [2]);
 
 console.log('Turnier-Tests bestanden.');
+
+// ---- Geladene Daten prüfen ----
+
+const valid = () => ({
+  players: [{ id: 'abc1', name: 'Anna' }, { id: 'abc2', name: 'Ben' }],
+  games: [{ id: 'g1', date: '2026-11-24T10:00:00.000Z', mode: '501', players: ['abc1', 'abc2'], winner: 'abc1', darts: [15, 12] }],
+  settings: { name: 'Office Darts', banner: 'Pause!' },
+  tournaments: [],
+});
+assert.ok(D.cleanData(valid()));
+// Mit Turnier aus der echten Auslosung
+const vt = valid();
+vt.players.push({ id: 'abc3', name: 'Cem' });
+const tv = D.tourneyStart({ id: 't1', name: 'Test', date: '2026-11-24T10:00:00.000Z', mode: 'x01', start: 301 },
+  ['abc1', 'abc2', 'abc3'], seeded(3));
+vt.tournaments.push(tv);
+assert.ok(D.cleanData(vt));
+
+const broken = change => { const d = valid(); change(d); return () => D.cleanData(d); };
+assert.throws(broken(d => { d.players[0].id = '"><img src=x onerror=alert(1)>'; }), /ungültig/);   // XSS über die ID
+assert.throws(broken(d => { d.games[0].winner = 'x" onclick="y'; }), /ungültig/);
+assert.throws(broken(d => { d.players[0].name = 'x'.repeat(41); }), /ungültig/);
+assert.throws(broken(d => { d.settings.banner = 'x'.repeat(121); }), /ungültig/);
+assert.throws(broken(d => { d.games[0].players = ['abc1', 'fremd']; }), /ungültig/);     // unbekannte Person
+assert.throws(broken(d => { d.games[0].date = 'gestern'; }), /ungültig/);
+assert.throws(broken(d => { d.games[0]['on click'] = 1; }), /ungültig/);                  // seltsamer Feldname
+assert.throws(broken(d => { d.tournaments = [{ id: 't', name: 'x', date: '2026-11-24', mode: '<b>', players: [], rounds: [] }]; }), /ungültig/);
+assert.throws(() => D.cleanData({ players: 'nein', games: [] }), /ungültig/);
+assert.throws(() => D.cleanData(JSON.parse('{"players":[],"games":[],"__proto__":{"x":1}}')), /ungültig/);
+
+// ---- Plausibilität ----
+
+assert.strictEqual(D.minDarts(501), 9);
+assert.strictEqual(D.minDarts(301), 6);
+const pg = { mode: '501', players: ['a', 'b'], winner: 'a', darts: [15, 15], secs: 300 };
+assert.deepStrictEqual(D.suspicious(pg), []);
+assert.match(D.suspicious({ ...pg, darts: [6, 3] })[0], /unmöglich/);
+assert.match(D.suspicious({ ...pg, secs: 20 })[0], /Sekunden/);
+assert.deepStrictEqual(D.suspicious({ mode: 'Cricket', players: ['a', 'b'], winner: 'a', darts: [30, 30] }), []);   // ohne Dauer: alte Spiele
+
+console.log('Prüf-Tests bestanden.');

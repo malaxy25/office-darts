@@ -46,13 +46,15 @@
 
   const activePlayers = () => db.players.filter(p => !p.deleted);
   // Turnierspiele zählen nur, wenn beim Start so gewählt (sonst ranked: false).
-  const rankedGames = () => db.games.filter(g => g.ranked !== false);
+  // Annullierte Spiele (Admin, «Letzte Spiele») zählen nirgends mehr, bleiben aber sichtbar.
+  const rankedGames = () => db.games.filter(g => g.ranked !== false && !g.annulled);
   const tourneys = () => db.tournaments || (db.tournaments = []);
   const playerName = id => (db.players.find(p => p.id === id) || { name: '?' }).name;
 
   // ---- Ansichten ----
 
   function show(view) {
+    if (view === 'settings' && !isAdmin()) { requireAdmin(() => show('settings')); return; }
     $$('.tabs button[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     const id = view === 'play' ? (game ? 'view-play' : 'view-setup') : 'view-' + view;
     $$('main.view').forEach(m => { m.hidden = m.id !== id; });
@@ -121,7 +123,7 @@
         const b = bonus(p.id);
         badge = `<span class="badge ${b === best ? 'best' : ''}">${b === best ? '★ ' : ''}+${b}</span>`;
       }
-      return `<button data-id="${p.id}" class="${i >= 0 ? 'on' : ''}">` +
+      return `<button data-id="${esc(p.id)}" class="${i >= 0 ? 'on' : ''}">` +
         (i >= 0 ? `<span class="order">${i + 1}</span>` : '') + esc(p.name) + badge + '</button>';
     }).join('');
     $('#setup-hint').textContent = me
@@ -360,7 +362,7 @@
 
   function scoreCard(i, p, sub, pts) {
     return `<div class="score ${i === p ? 'current' : ''}"><span class="name">${esc(playerName(game.players[i]))}` +
-      `<span class="avg">${sub}</span></span><span class="pts">${pts}</span></div>`;
+      `<span class="avg">${esc(sub)}</span></span><span class="pts">${esc(pts)}</span></div>`;
   }
 
   // Cricket: Felder als Zeilen, Spielende als Spalten. / = 1 Treffer, ✕ = 2, eingekreist = geschlossen.
@@ -440,14 +442,14 @@
       const d = game.darts[i];
       if (d) {
         html += `<button class="dart ${r.bust && i === r.used - 1 ? 'void' : ''}" data-i="${i}">` +
-          esc(d.label) + (isX01(game) ? `<small>${d.points}</small>` : '') + '</button>';
+          esc(d.label) + (isX01(game) ? `<small>${esc(d.points)}</small>` : '') + '</button>';
       } else {
         html += `<div class="dart button empty">${i + 1}</div>`;
       }
     }
     if (editing >= 0 && game.darts[editing]) {
       const v = game.darts[editing].value;
-      html += '<div class="mult-pick" style="grid-column: 1 / -1">' +
+      html += '<div class="mult-pick">' +
         (v === 25
           ? '<button data-mult="1">25</button><button data-mult="2">Bull</button>'
           : `<button data-mult="1">${v || 20}</button><button data-mult="2">D${v || 20}</button><button data-mult="3">T${v || 20}</button>`) +
@@ -490,6 +492,7 @@
       players: g.players,
       winner,
       darts: g.thrown,
+      secs: Math.round((Date.now() - Date.parse(g.startedAt)) / 1000),   // für die Plausibilität
     };
     if (x01) entry.avg = g.players.map((_, j) => Number((g.thrown[j] ? g.scored[j] / g.thrown[j] * 3 : 0).toFixed(1)));
     if (g.mode === 'cricket') entry.points = g.points;
@@ -594,8 +597,8 @@
       const state = p
         ? `<span class="tl-win">🏆 ${esc(playerName(p[0]))}</span>`
         : `<span class="tl-live">läuft · ${Darts.roundName(t.rounds[t.rounds.length - 1].size)}</span>`;
-      return `<button class="tile" data-tourney="${t.id}"><b>${esc(t.name)}</b>` +
-        `<span class="hint">${new Date(t.date).toLocaleDateString('de-CH')} · ${esc(tourneyMode(t))} · ${t.players.length} Personen</span>` +
+      return `<button class="tile" data-tourney="${esc(t.id)}"><b>${esc(t.name)}</b>` +
+        `<span class="hint">${new Date(t.date).toLocaleDateString('de-CH')} · ${esc(tourneyMode(t))} · ${Number(t.players.length)} Personen</span>` +
         state + '</button>';
     }).join('');
   }
@@ -622,7 +625,7 @@
     const players = activePlayers();
     tPicked = tPicked.filter(id => players.some(p => p.id === id));
     $('#ts-players').innerHTML = players.map(p =>
-      `<button data-id="${p.id}" class="${tPicked.indexOf(p.id) >= 0 ? 'on' : ''}">${esc(p.name)}</button>`).join('') ||
+      `<button data-id="${esc(p.id)}" class="${tPicked.indexOf(p.id) >= 0 ? 'on' : ''}">${esc(p.name)}</button>`).join('') ||
       '<p class="hint">Noch niemand erfasst – unter «Spielende» Namen hinzufügen.</p>';
     const n = tPicked.length;
     $('#ts-hint').textContent = n < 3
@@ -686,7 +689,7 @@
     const inner = (label ? `<div class="mlabel">${label}</div>` : '') + sideHtml(m, m.a) + sideHtml(m, m.b) +
       (note ? `<div class="mnote">${note}</div>` : '');
     return open
-      ? `<button class="${cls}" data-match="${m.id}">${inner}</button>`
+      ? `<button class="${cls}" data-match="${esc(m.id)}">${inner}</button>`
       : `<div class="${cls}">${inner}</div>`;
   }
 
@@ -758,8 +761,8 @@
           ? '<p class="hint warn">Es läuft schon ein Spiel – zuerst beenden oder abbrechen.</p>' +
             '<div class="row buttons"><button id="tr-goto" class="primary">Zum laufenden Spiel</button></div>'
           : '<div class="row buttons"><button id="tr-play" class="primary">Spiel starten</button></div>') +
-        `<div class="row buttons"><button data-wo="${m.a}">${a} kampflos weiter</button>` +
-        `<button data-wo="${m.b}">${b} kampflos weiter</button></div>` +
+        `<div class="row buttons"><button data-wo="${esc(m.a)}">${a} kampflos weiter</button>` +
+        `<button data-wo="${esc(m.b)}">${b} kampflos weiter</button></div>` +
         '<p class="hint">Kampflos nur, wenn jemand nicht antreten kann. Zweimal tippen.</p>';
     }
 
@@ -809,7 +812,7 @@
     }
     const ab = e.target.closest('#tr-abort');
     if (ab) {
-      twoTap(ab, () => {
+      twoTap(ab, () => requireAdmin(() => {
         // Gespielte Spiele bleiben; ein laufendes Spiel wird zum normalen Spiel.
         db.tournaments = tourneys().filter(x => x.id !== t.id);
         tViewing = null;
@@ -817,7 +820,7 @@
         tSelected = null;
         saveDb();
         renderTourney();
-      });
+      }));
     }
   });
 
@@ -829,7 +832,7 @@
         done.map(t => {
           const p = Darts.tourneyPodium(t);
           const n = i => (p[i] ? esc(playerName(p[i])) : '–');
-          return `<tr class="link-row" data-tourney="${t.id}"><td>${esc(t.name)}</td><td>${day(t.date)}</td><td><b>${n(0)}</b></td><td>${n(1)}</td><td>${n(2)}</td></tr>`;
+          return `<tr class="link-row" data-tourney="${esc(t.id)}"><td>${esc(t.name)}</td><td>${day(t.date)}</td><td><b>${n(0)}</b></td><td>${n(1)}</td><td>${n(2)}</td></tr>`;
         }).join('')
       : '<tr><td class="hint">Noch kein Turnier beendet.</td></tr>';
   }
@@ -911,6 +914,7 @@
     const players = activePlayers();
     renderHonors(sorted);
     renderTourneyHistory();
+    renderRecent();
 
     const elo = Darts.eloRatings(games);
     const eloRows = players.filter(p => elo.played[p.id])
@@ -961,13 +965,160 @@
     }
   }
 
+  // ---- Admin (PIN) ----
+  // Einstellungen, Löschen von Spielenden, Turnier abbrechen und Spiele annullieren nur mit PIN. Die PIN wird beim
+  // ersten Öffnen festgelegt und unter «Einstellungen» geändert; sie liegt gehasht nur auf diesem Gerät (nicht in
+  // der Sicherung). Vergessen: mit dem Neon-Zugang neu festlegen. Kein Hochsicherheitsschutz – gegen Spass-Sabotage.
+
+  const KEY_ADMIN = 'officeDarts.admin';
+  const ADMIN_MINUTES = 5;          // so lange bleibt entsperrt (ab der letzten Admin-Aktion)
+  const MAX_TRIES = 5, WAIT_SECONDS = 60;
+  let adminUntil = 0;
+  let pinTries = 0, pinBlockedUntil = 0;
+  let pinMode = 'enter';            // 'enter', 'set' (erstes Mal, ändern, nach «vergessen»), 'forgot'
+  let pinThen = null;               // was nach der richtigen PIN passiert
+
+  function isAdmin() { return Date.now() < adminUntil; }
+  function touchAdmin() { if (isAdmin()) adminUntil = Date.now() + ADMIN_MINUTES * 60000; }
+  const adminPin = () => load(KEY_ADMIN, null);
+
+  async function pinHash(pin, salt) {
+    if (!(window.crypto && crypto.subtle)) throw new Error('Dieser Browser kann die PIN nicht prüfen (nur über https).');
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt),
+      iterations: 100000 }, key, 256);
+    return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function requireAdmin(action) {
+    if (isAdmin()) { touchAdmin(); action(); return; }
+    openPin(adminPin() ? 'enter' : 'set', action);
+  }
+
+  function openPin(mode, then) {
+    pinMode = mode;
+    pinThen = then || null;
+    const titles = { enter: 'Admin-PIN', set: adminPin() ? 'Neue Admin-PIN' : 'Admin-PIN festlegen', forgot: 'PIN vergessen' };
+    const texts = {
+      enter: 'Für Einstellungen, Löschen und Annullieren.',
+      set: adminPin() ? '4 bis 8 Ziffern, zweimal.'
+        : 'Zum ersten Mal: eine PIN mit 4 bis 8 Ziffern festlegen. Sie schützt Einstellungen, Löschen und Annullieren.',
+      forgot: 'Den Neon-Zugang eingeben, der auf diesem Tablet eingetragen ist – dann lässt sich eine neue PIN festlegen.',
+    };
+    $('#pin-title').textContent = titles[mode];
+    $('#pin-text').textContent = texts[mode];
+    $('#pin-1').hidden = mode === 'forgot';
+    $('#pin-2').hidden = mode !== 'set';
+    $('#pin-neon').hidden = mode !== 'forgot';
+    $('#pin-forgot').hidden = mode !== 'enter';
+    ['#pin-1', '#pin-2', '#pin-neon'].forEach(s => { $(s).value = ''; });
+    $('#pin-error').textContent = '';
+    $('#pin').hidden = false;
+    (mode === 'forgot' ? $('#pin-neon') : $('#pin-1')).focus();
+  }
+  function closePin() { $('#pin').hidden = true; pinThen = null; }
+
+  $('#pin-cancel').addEventListener('click', closePin);
+  $('#pin-forgot').addEventListener('click', () => {
+    if (!cloud.url) {
+      $('#pin-error').textContent = 'Ohne Neon-Zugang geht das nicht: Browserdaten der Seite löschen und die Sicherung neu laden.';
+      return;
+    }
+    openPin('forgot', pinThen);
+  });
+  $('#pin-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const error = $('#pin-error');
+    const pin = $('#pin-1').value;
+    try {
+      if (pinMode === 'forgot') {
+        if ($('#pin-neon').value.trim() !== cloud.url.trim()) { error.textContent = 'Das ist nicht der eingetragene Zugang.'; return; }
+        openPin('set', pinThen);
+        return;
+      }
+      if (pinMode === 'set') {
+        if (!/^[0-9]{4,8}$/.test(pin)) { error.textContent = 'Bitte 4 bis 8 Ziffern.'; return; }
+        if (pin !== $('#pin-2').value) { error.textContent = 'Die beiden Eingaben sind nicht gleich.'; return; }
+        const salt = uid();
+        save(KEY_ADMIN, { salt, hash: await pinHash(pin, salt) });
+      } else {
+        if (Date.now() < pinBlockedUntil) {
+          error.textContent = `Zu viele Versuche – in ${Math.ceil((pinBlockedUntil - Date.now()) / 1000)} Sekunden nochmals.`;
+          return;
+        }
+        const stored = adminPin();
+        if (!stored || await pinHash(pin, stored.salt) !== stored.hash) {
+          pinTries++;
+          if (pinTries >= MAX_TRIES) { pinTries = 0; pinBlockedUntil = Date.now() + WAIT_SECONDS * 1000; }
+          error.textContent = 'Falsche PIN.';
+          $('#pin-1').value = '';
+          return;
+        }
+        pinTries = 0;
+      }
+    } catch (err) {
+      error.textContent = err.message;
+      return;
+    }
+    adminUntil = Date.now() + ADMIN_MINUTES * 60000;
+    const then = pinThen;
+    closePin();
+    if (then) then();
+  });
+
+  function lockAdmin() {
+    adminUntil = 0;
+    if (!$('#view-settings').hidden) show('play');
+    if (!$('#view-ranking').hidden) renderRecent();
+  }
+  // Abgelaufen, während die Einstellungen offen sind: zurück zum Spiel.
+  setInterval(() => { if (!isAdmin() && !$('#view-settings').hidden) lockAdmin(); }, 10000);
+  document.addEventListener('click', e => { if (e.target.closest('#view-settings')) touchAdmin(); });
+
+  $('#btn-pin-change').addEventListener('click', () => requireAdmin(() => openPin('set', () => {
+    $('#btn-pin-change').textContent = 'PIN geändert ✓';
+    setTimeout(() => { $('#btn-pin-change').textContent = 'PIN ändern'; }, 3000);
+  })));
+  $('#btn-lock').addEventListener('click', lockAdmin);
+
+  // ---- Letzte Spiele (Rangliste): auffällige erkennen, falsche annullieren ----
+
+  const RECENT = 15;
+  function renderRecent() {
+    const list = db.games.slice(-RECENT).reverse();
+    const when = d => new Date(d).toLocaleString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit',
+      hour: '2-digit', minute: '2-digit' });
+    $('#recent').innerHTML = list.length ? list.map(g => {
+      const why = Darts.suspicious(g);
+      const total = Array.isArray(g.darts) ? g.darts.reduce((s, n) => s + n, 0) : 0;
+      const minutes = typeof g.secs === 'number' ? ` · ${Math.max(1, Math.round(g.secs / 60))} Min.` : '';
+      return `<li class="${g.annulled ? 'annulled' : ''}"><span>` +
+        `<span><b>${esc(g.players.map(playerName).join(' – '))}</b> · ${esc(g.mode)} · Sieg ${esc(playerName(g.winner))}</span>` +
+        `<span class="hint">${esc(when(g.date))} · ${total} Pfeile${minutes}` +
+        (g.ranked === false ? ' · zählt nicht (Turnier)' : '') + (g.annulled ? ' · annulliert' : '') + '</span>' +
+        (why.length && !g.annulled ? `<span class="hint warn suspicious">⚠ ${esc(why.join(' · '))}</span>` : '') +
+        `</span><button class="del" data-annul="${esc(g.id)}">${g.annulled ? 'Wieder zählen' : 'Annullieren'}</button></li>`;
+    }).join('') : '<li class="hint">Noch keine Spiele.</li>';
+  }
+  $('#recent').addEventListener('click', e => {
+    const b = e.target.closest('[data-annul]');
+    if (!b) return;
+    requireAdmin(() => {
+      const g = db.games.find(x => x.id === b.dataset.annul);
+      if (!g) return;
+      if (g.annulled) delete g.annulled; else g.annulled = true;
+      saveDb();
+      renderRanking();
+    });
+  });
+
   // ---- Spielende ----
 
   function renderPlayers() {
     $('#player-list').innerHTML = activePlayers().map(p => {
       const n = db.games.filter(g => g.players.includes(p.id)).length;
       return `<li><span>${esc(p.name)} <span class="hint">· ${n} Spiele</span></span>` +
-        `<button class="del" data-player="${p.id}">Löschen</button></li>`;
+        `<button class="del" data-player="${esc(p.id)}">Löschen</button></li>`;
     }).join('') || '<li class="hint">Noch niemand erfasst.</li>';
   }
 
@@ -991,13 +1142,19 @@
   $('#player-list').addEventListener('click', e => {
     const b = e.target.closest('[data-player]');
     if (!b) return;
-    twoTap(b, () => {
+    twoTap(b, () => requireAdmin(() => {
       const p = db.players.find(x => x.id === b.dataset.player);
+      if (!p) return;
       p.deleted = true;
       p.name = 'Gelöscht';
       saveDb();
       renderPlayers();
-    });
+      // Ältere Stände in Neon enthalten den Namen noch – den Befehl dafür zeigen (nur der Datenbank-Admin darf das).
+      const hint = $('#forget-hint');
+      hint.hidden = !cloud.url;
+      hint.textContent = 'Der Name steckt noch in älteren Ständen in Neon. Im SQL-Editor von Neon ausführen: ' +
+        `select darts_forget('${p.id}');`;
+    }));
   });
 
   // ---- Einstellungen ----
@@ -1089,9 +1246,7 @@
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const data = JSON.parse(await file.text());
-      if (!Array.isArray(data.players) || !Array.isArray(data.games)) throw new Error('format');
-      db = data;
+      db = Darts.cleanData(JSON.parse(await file.text()));
       saveDb();
       applySettings();
       renderSettings();
@@ -1176,6 +1331,7 @@
       save(KEY_BACKUP, cloud.last);
     } catch (err) {
       cloudError = err.message;
+      if (cloud.dirty) { clearTimeout(cloudTimer); cloudTimer = setTimeout(cloudPush, 30000); }   // nochmals versuchen
     }
     if (!$('#view-settings').hidden) renderSettings();
     return !cloudError;
@@ -1228,9 +1384,7 @@
       try {
         const rows = await neonQuery('select data, created_at from darts_backup order by id desc limit 1');
         if (!rows.length) throw new Error('Noch nichts in der Datenbank');
-        const data = JSON.parse(rows[0].data);
-        if (!Array.isArray(data.players) || !Array.isArray(data.games)) throw new Error('Stand ungültig');
-        db = data;
+        db = Darts.cleanData(JSON.parse(rows[0].data));
         save(KEY, db);
         cloud.dirty = false;
         saveCloud();

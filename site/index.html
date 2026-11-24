@@ -2,6 +2,8 @@
 <html lang="de-CH">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.neon.tech https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#14181f">
   <meta name="mobile-web-app-capable" content="yes">
@@ -83,6 +85,24 @@
   </main>
 
   <!-- Sieg -->
+  <div id="pin" class="overlay" hidden>
+    <div class="card">
+      <h2 id="pin-title">Admin-PIN</h2>
+      <p id="pin-text" class="hint"></p>
+      <form id="pin-form" class="pin-form">
+        <input id="pin-1" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN" aria-label="PIN">
+        <input id="pin-2" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN wiederholen" aria-label="PIN wiederholen" hidden>
+        <input id="pin-neon" type="password" autocomplete="off" spellcheck="false" placeholder="postgresql://…" aria-label="Neon-Zugang" hidden>
+        <p id="pin-error" class="hint warn" role="alert"></p>
+        <div class="row buttons">
+          <button class="primary">OK</button>
+          <button type="button" id="pin-cancel">Abbrechen</button>
+        </div>
+        <button type="button" id="pin-forgot" class="link">PIN vergessen?</button>
+      </form>
+    </div>
+  </div>
+
   <div id="win" class="overlay" hidden>
     <div class="card">
       <h2 id="win-title"></h2>
@@ -182,6 +202,12 @@
       <table id="table-tourneys"></table>
     </section>
     <section class="card">
+      <h2>Letzte Spiele</h2>
+      <p class="hint">Falsch erfasst oder erfunden? Annullieren (Admin-PIN) – das Spiel bleibt sichtbar, zählt aber nicht mehr.
+        ⚠ = auffällig (unmöglich wenige Pfeile oder sehr schnell erfasst).</p>
+      <ul id="recent" class="list"></ul>
+    </section>
+    <section class="card">
       <h2>Mit wem noch nie?</h2>
       <p class="hint">Paare, die noch nie gegeneinander gespielt haben.</p>
       <div id="never" class="chips static"></div>
@@ -198,11 +224,21 @@
         <button class="primary">Hinzufügen</button>
       </form>
       <ul id="player-list" class="list"></ul>
+      <p id="forget-hint" class="hint warn" hidden></p>
     </section>
   </main>
 
   <!-- Einstellungen -->
   <main id="view-settings" class="view" hidden>
+    <section class="card">
+      <h2>Admin</h2>
+      <p class="hint">Einstellungen, Löschen von Spielenden, Turnier abbrechen und Annullieren brauchen die Admin-PIN.
+        Nach 5 Minuten ohne Admin-Aktion wird wieder gesperrt.</p>
+      <div class="row buttons">
+        <button id="btn-pin-change">PIN ändern</button>
+        <button id="btn-lock">Jetzt sperren</button>
+      </div>
+    </section>
     <section class="card">
       <h2>Speicher</h2>
       <p class="hint">Alles liegt im Speicher dieses Browsers. Wer die Browserdaten löscht, löscht auch die Resultate.</p>
@@ -225,22 +261,54 @@
       </div>
       <details class="hint">
         <summary>Datenbank einrichten (einmal, im SQL Editor von Neon)</summary>
-        <p>Das Tablet bekommt einen eigenen Zugang, der nur neue Stände anhängen und lesen darf – nichts ändern oder löschen. Die ältesten Stände (ab 200) räumt die Datenbank selbst weg.</p>
+        <p>Das Tablet bekommt einen eigenen Zugang, der nur neue Stände anhängen und lesen darf – nichts ändern oder löschen.
+          Die Datenbank prüft jeden Stand (Form, höchstens 300 KB, höchstens alle 2 Sekunden) und behält die letzten 200
+          Stände und dazu den letzten jedes Tages während eines Jahres – so lässt sich die Geschichte nicht mit vielen
+          leeren Ständen wegspülen. Für eine bestehende Datenbank genügt alles ab <code>create or replace function</code>
+          (die Tabelle und den Benutzer gibt es schon).</p>
         <pre>create table darts_backup (
   id bigserial primary key,
   created_at timestamptz not null default now(),
   data jsonb not null
 );
 
-create function darts_save(d jsonb) returns void
-language sql security definer set search_path = public as $$
+create or replace function darts_save(d jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if octet_length(d::text) &gt; 300000 then raise exception 'Stand zu gross (hoechstens 300 KB)'; end if;
+  if jsonb_typeof(d-&gt;'players') is distinct from 'array'
+     or jsonb_typeof(d-&gt;'games') is distinct from 'array' then raise exception 'Stand ungueltig'; end if;
+  if exists (select 1 from darts_backup where created_at &gt; now() - interval '2 seconds') then
+    raise exception 'Zu schnell hintereinander – wird gleich nochmals versucht';
+  end if;
   insert into darts_backup (data) values (d);
-  delete from darts_backup where id not in
-    (select id from darts_backup order by id desc limit 200);
-$$;
+  delete from darts_backup b
+  where b.id not in (select id from darts_backup order by id desc limit 200)
+    and b.id not in (select max(id) from darts_backup
+                     where created_at &gt; now() - interval '366 days' group by created_at::date);
+end $$;
+
+-- Name einer geloeschten Person auch aus den alten Staenden entfernen (nur hier im SQL-Editor, nicht vom Tablet)
+create or replace function darts_forget(pid text) returns integer
+language plpgsql as $$
+declare n integer;
+begin
+  update darts_backup b set data = jsonb_set(b.data, '{players}', (
+      select jsonb_agg(case when x.p-&gt;&gt;'id' = pid
+               then jsonb_build_object('id', pid, 'name', 'Gelöscht', 'deleted', true) else x.p end order by x.o)
+      from jsonb_array_elements(b.data-&gt;'players') with ordinality as x(p, o)))
+  where b.data-&gt;'players' @&gt; jsonb_build_array(jsonb_build_object('id', pid));
+  get diagnostics n = row_count;
+  return n;
+end $$;
 
 create role darts_tablet login password 'LANGES-ZUFALLS-PASSWORT';
+alter role darts_tablet set statement_timeout = '5s';
+alter role darts_tablet connection limit 5;
 revoke execute on function darts_save(jsonb) from public;
+revoke execute on function darts_forget(text) from public;
+revoke create on schema public from public;
+revoke temporary on database neondb from public;
 grant execute on function darts_save(jsonb) to darts_tablet;
 grant select on darts_backup to darts_tablet;</pre>
         <p>Dann die Verbindung von Neon kopieren und Benutzer und Passwort durch <code>darts_tablet</code> und das Passwort oben ersetzen.</p>

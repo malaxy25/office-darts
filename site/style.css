@@ -198,7 +198,7 @@ body.playing { height: 100vh; height: 100dvh; overflow: hidden; }
 .turn-info.bust { color: var(--danger); font-weight: 700; }
 .turn-info.win { color: var(--accent); font-weight: 700; }
 
-.mult-pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-bottom: 6px; }
+.mult-pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-bottom: 6px; grid-column: 1 / -1; }
 
 .overlay {
   position: fixed; inset: 0; background: rgba(0, 0, 0, .65);
@@ -304,3 +304,14 @@ body.playing .brand { display: none; }
 .tile .tl-live { color: var(--accent); font-weight: 700; }
 #table-tourneys tr.link-row { cursor: pointer; }
 #table-tourneys tr.link-row:hover td { background: #2a3240; }
+
+/* Admin-PIN */
+.pin-form { display: grid; gap: 10px; }
+.pin-form input { font-size: 22px; text-align: center; letter-spacing: 4px; }
+.pin-form #pin-neon { font-size: 15px; letter-spacing: 0; }
+#pin-forgot { font-size: 15px; }
+
+/* Letzte Spiele */
+#recent li > span { display: grid; gap: 2px; }
+#recent li.annulled > span { opacity: .55; text-decoration: line-through; }
+#recent .suspicious { text-decoration: none; }
