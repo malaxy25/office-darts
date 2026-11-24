@@ -60,7 +60,7 @@ Alles soll **kostenlos** bleiben (Stand Oktober 2026):
 
 ## Backlog
 
-- [ ] **Läuft auch auf alten iPads (iOS 12 / Safari 12)**, z. B. iPad Air 1 (ME988). Keine
+- [ ] *(zurückgestellt 24.11.: neues Tablet ist ein Huawei MatePad mit aktuellem Browser)* **Läuft auch auf alten iPads (iOS 12 / Safari 12)**, z. B. iPad Air 1 (ME988). Keine
   Geräteerkennung, sondern ein Code für alle Geräte:
   - JavaScript ohne `??` und `??=` (startet sonst auf Safari 12 gar nicht); `file.text()` durch
     `FileReader` ersetzen.
